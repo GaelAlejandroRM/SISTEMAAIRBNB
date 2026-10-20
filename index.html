@@ -8,9 +8,12 @@
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <a href="anfitrion.html">Modo anfitrión</a>
+  <div style="background: #24332f; color: white; padding: 6px 16px; font-size: 13px; display: flex; gap: 14px; justify-content: flex-end; align-items: center;">
+    <span>Vistas del sistema:</span>
+    <a href="huesped.html" style="color: #6ee7b7; font-weight: 600; text-decoration: none;">Modo Huésped ↗</a>
+    <a href="anfitrion.html" style="color: #93c5fd; font-weight: 600; text-decoration: none;">Modo Anfitrión ↗</a>
+  </div>
   
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="public/favicon.svg" />
@@ -61,7 +64,9 @@
 
           <div class="dropdown-menu hidden" id="profile-dropdown">
             <a href="#signup" class="dropdown-item" style="font-weight: 600;">Registrarse</a>
-            <a href="#login" class="dropdown-item">Iniciar sesión</a>
+            <div class="dropdown-divider"></div>
+            <a href="huesped.html" class="dropdown-item" style="font-weight: 600; color: #176a54;">✈ Espacio del Huésped</a>
+            <a href="anfitrion.html" class="dropdown-item" style="font-weight: 600; color: #176a54;">⌂ Espacio del Anfitrión</a>
             <div class="dropdown-divider"></div>
             <a href="#host" class="dropdown-item">Pon tu espacio en Airbnb</a>
             <a href="#help" class="dropdown-item">Centro de ayuda</a>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Espacio de huésped de Nómada - Encuentra, explora y reserva alojamientos únicos">
+  <title>Nómada | Huésped</title>
+
+  <link rel="stylesheet" href="css/huesped.css">
+  <script src="js/huesped.js" defer></script>
+</head>
+
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <!-- Barra lateral de navegación del huésped -->
+  <aside class="sidebar">
+    <a class="marca" href="index.html">
+      nómada
+      <span>ESPACIO DEL HUÉSPED</span>
+    </a>
+
+    <nav aria-label="Navegación del huésped">
+      <button type="button" data-vista="explorar" class="activo">
+        <span class="nav-icono" aria-hidden="true">⌕</span>
+        <span>Explorar estancias</span>
+      </button>
+
+      <button type="button" data-vista="viajes">
+        <span class="nav-icono" aria-hidden="true">✈</span>
+        <span>Mis reservaciones</span>
+        <span class="badge-nav" id="badge-viajes" hidden>0</span>
+      </button>
+
+      <button type="button" data-vista="favoritos">
+        <span class="nav-icono" aria-hidden="true">♡</span>
+        <span>Favoritos</span>
+        <span class="badge-nav" id="badge-favoritos" hidden>0</span>
+      </button>
+
+      <button type="button" data-vista="resenas">
+        <span class="nav-icono" aria-hidden="true">☆</span>
+        <span>Mis opiniones</span>
+      </button>
+
+      <button type="button" data-vista="notificaciones">
+        <span class="nav-icono" aria-hidden="true">○</span>
+        <span>Notificaciones</span>
+        <span class="badge-nav alerta" id="badge-notificaciones" hidden>0</span>
+      </button>
+
+      <button type="button" data-vista="perfil">
+        <span class="nav-icono" aria-hidden="true">👤</span>
+        <span>Mi perfil</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-pie">
+      <div class="avatar" id="avatar-sidebar" aria-hidden="true">H</div>
+      <div class="usuario-info">
+        <strong id="nombre-sidebar">Huésped Nómada</strong>
+        <small>Viajero verificado</small>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Contenido principal -->
+  <main id="contenido" tabindex="-1">
+    <header class="barra-superior">
+      <div class="barra-superior-izq">
+        <span class="etiqueta-barra">Tu espacio de huésped</span>
+        <span class="separador-barra" aria-hidden="true">/</span>
+        <span id="titulo-pagina-barra" class="titulo-pagina-barra">Explorar estancias</span>
+      </div>
+
+      <div class="barra-superior-der">
+        <a href="anfitrion.html" class="boton-modo-anfitrion" title="Ir al espacio del anfitrión">
+          <span>Modo anfitrión ↗</span>
+        </a>
+        <a href="index.html" class="enlace-inicio">Volver al inicio</a>
+      </div>
+    </header>
+
+    <div class="aviso-demo">
+      <div class="aviso-demo-texto">
+        <span class="icono-aviso" aria-hidden="true">⚡</span>
+        <span>
+          <strong>Prototipo frontend de Huésped.</strong>
+          Conectado en tiempo real con el panel de anfitrión en este navegador.
+        </span>
+      </div>
+
+      <div class="aviso-demo-acciones">
+        <button id="cargar-demo" type="button">
+          Cargar ejemplos
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenedor dinámico de pantallas -->
+    <div id="vista"></div>
+  </main>
+
+  <!-- Notificación toast flotante -->
+  <div id="mensaje" role="status" aria-live="polite" hidden></div>
+
+  <!-- MODAL: Detalle de Alojamiento y Formulario de Reserva -->
+  <dialog id="modal-detalle">
+    <div class="modal-contenedor">
+      <div class="encabezado-modal">
+        <div>
+          <p class="etiqueta">DETALLES DEL ALOJAMIENTO</p>
+          <h2 id="detalle-titulo">Alojamiento</h2>
+        </div>
+
+        <button
+          id="cerrar-detalle"
+          class="boton-icono"
+          type="button"
+          aria-label="Cerrar detalles del alojamiento"
+        >✕</button>
+      </div>
+
+      <div class="detalle-cuerpo" id="detalle-cuerpo">
+        <!-- Renderizado dinámicamente por js/huesped.js -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- MODAL: Comprobante / Itinerario de Viaje -->
+  <dialog id="modal-voucher">
+    <div class="modal-contenedor modal-voucher-contenedor">
+      <div class="encabezado-modal">
+        <div>
+          <p class="etiqueta">COMPROBANTE DE RESERVACIÓN</p>
+          <h2 id="voucher-titulo">Itinerario de estancia</h2>
+        </div>
+
+        <button
+          id="cerrar-voucher"
+          class="boton-icono"
+          type="button"
+          aria-label="Cerrar comprobante"
+        >✕</button>
+      </div>
+
+      <div class="voucher-cuerpo" id="voucher-cuerpo">
+        <!-- Renderizado dinámicamente por js/huesped.js -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- MODAL: Calificar Estancia (Dejar Reseña) -->
+  <dialog id="modal-resena">
+    <div class="modal-contenedor">
+      <form id="form-resena">
+        <div class="encabezado-modal">
+          <div>
+            <p class="etiqueta">COMPARTE TU EXPERIENCIA</p>
+            <h2 id="resena-modal-titulo">Escribir reseña</h2>
+          </div>
+
+          <button
+            id="cerrar-resena"
+            class="boton-icono"
+            type="button"
+            aria-label="Cerrar formulario de reseña"
+          >✕</button>
+        </div>
+
+        <p class="texto-secundario" id="resena-alojamiento-subtitulo">
+          Tu opinión ayuda a futuros viajeros y al anfitrión a mejorar el espacio.
+        </p>
+
+        <input type="hidden" name="alojamientoId" id="resena-alojamiento-id">
+        <input type="hidden" name="reservaId" id="resena-reserva-id">
+        <input type="hidden" name="puntuacion" id="resena-puntuacion" value="5">
+
+        <div class="campo-estrellas-contenedor">
+          <label class="etiqueta-estrellas">Calificación general:</label>
+          <div class="estrellas-selector" id="estrellas-selector" role="radiogroup" aria-label="Calificación de 1 a 5 estrellas">
+            <button type="button" class="estrella-btn activa" data-valor="1" aria-label="1 estrella">★</button>
+            <button type="button" class="estrella-btn activa" data-valor="2" aria-label="2 estrellas">★</button>
+            <button type="button" class="estrella-btn activa" data-valor="3" aria-label="3 estrellas">★</button>
+            <button type="button" class="estrella-btn activa" data-valor="4" aria-label="4 estrellas">★</button>
+            <button type="button" class="estrella-btn activa" data-valor="5" aria-label="5 estrellas">★</button>
+          </div>
+          <span class="estrellas-texto" id="estrellas-texto">Excelente (5 de 5)</span>
+        </div>
+
+        <label>
+          Tu nombre como huésped *
+          <input
+            id="resena-huesped"
+            name="huesped"
+            maxlength="100"
+            placeholder="Ej. Mariana López"
+            required
+          >
+        </label>
+
+        <label>
+          Tu opinión sobre el alojamiento *
+          <textarea
+            id="resena-comentario"
+            name="comentario"
+            maxlength="1000"
+            rows="4"
+            placeholder="¿Qué fue lo que más te gustó? Cuéntanos sobre la limpieza, ubicación, comodidad y atención del anfitrión..."
+            required
+          ></textarea>
+        </label>
+
+        <div class="acciones-modal">
+          <button id="cancelar-resena" type="button">Cancelar</button>
+          <button class="primario" type="submit">Publicar reseña</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</body>
+</html>
