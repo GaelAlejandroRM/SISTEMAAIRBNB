@@ -105,49 +105,9 @@ function mensaje(texto, error = false) {
   }, 6000);
 }
 
-function cargarDatos() {
-  try {
-    const guardados = localStorage.getItem(CLAVE);
-
-    if (guardados) {
-      const parsed = JSON.parse(guardados);
-      const arrays = [
-        'alojamientos', 'reservas', 'bloqueos', 'resenas', 'notificaciones'
-      ];
-
-      if (
-        parsed.version !== 1 ||
-        !arrays.every(key => Array.isArray(parsed[key]))
-      ) {
-        throw new Error('Formato de almacenamiento no reconocido.');
-      }
-
-      datos = parsed;
-    }
-  } catch {
-    mensaje(
-      'No se pudieron cargar los datos locales. No se sobrescribirán hasta que guardes un cambio.',
-      true
-    );
-  }
-}
-
-// Primero persiste la copia y después actualiza la memoria.
-// Si se agota la cuota, la interfaz conserva el estado anterior.
-function actualizarDatos(mutacion) {
-  const copia = JSON.parse(JSON.stringify(datos));
-  mutacion(copia);
-
-  try {
-    localStorage.setItem(CLAVE, JSON.stringify(copia));
-  } catch {
-    throw new Error(
-      'No se pudo guardar. El almacenamiento puede estar lleno o bloqueado. ' +
-      'Prueba quitando fotografías antes de guardar.'
-    );
-  }
-
-  datos = copia;
+async function cargarDatos() {
+  datos = await Nomada.api('/api/anfitrion/panel');
+  if (!alojamientoPorId(ui.propiedadCalendario)) ui.propiedadCalendario = datos.alojamientos[0]?.id || '';
   render();
 }
 
@@ -210,7 +170,7 @@ function accionesReserva(reserva) {
     >${texto}</button>
   `;
 
-  if (reserva.estado === 'pendiente') {
+  if (reserva.estado === 'pendiente' && reserva.entrada >= hoy()) {
     return boton('confirmada', 'Aceptar') +
       boton('rechazada', 'Rechazar', true);
   }
@@ -249,7 +209,7 @@ function tablaReservas(reservas) {
                 <td>
                   <strong>${escapar(r.huesped)}</strong>
                   <small>${escapar(a?.titulo || 'Alojamiento no disponible')}</small>
-                  <small>Ejemplo · ${escapar(r.id.slice(0, 8))}</small>
+                  <small>Folio · ${escapar(r.id.slice(0, 8))}</small>
                 </td>
                 <td>
                   ${fechaTexto(r.entrada)}
@@ -296,10 +256,10 @@ function vistaResumen() {
     </section>
 
     <section class="indicadores" aria-label="Indicadores del anfitrión">
-      ${indicador('Alojamientos', datos.alojamientos.length, 'Registrados en este navegador')}
-      ${indicador('Publicados', publicados.length, 'Estado visual de publicación')}
-      ${indicador('Solicitudes', pendientes.length, 'Ejemplos pendientes de respuesta')}
-      ${indicador('Importe reservado', moneda(importe), 'Demostración; no son ingresos reales')}
+      ${indicador('Alojamientos', datos.alojamientos.length, 'Guardados en PostgreSQL')}
+      ${indicador('Publicados', publicados.length, 'Activos para consulta pública')}
+      ${indicador('Solicitudes', pendientes.length, 'Pendientes de respuesta')}
+      ${indicador('Importe reservado', moneda(importe), 'Importe reservado; no equivale a cobros')}
     </section>
 
     <section class="panel">
@@ -366,7 +326,7 @@ function vistaAlojamientos() {
           `;
         }).join('')}
       </div>
-    ` : vacio('No hay alojamientos. Crea uno o carga los ejemplos.')}
+    ` : vacio('No hay alojamientos. Crea tu primer espacio.')}
   `;
 }
 
@@ -531,7 +491,7 @@ function vistaReservas() {
 
   return encabezado(
     'Reservaciones',
-    'Solicitudes e historial de demostración de tus alojamientos.'
+    'Solicitudes e historial de tus alojamientos.'
   ) + `
     <div class="filtros">
       <label>
@@ -548,7 +508,7 @@ function vistaReservas() {
     </div>
 
     <p class="texto-secundario">
-      Aceptar y rechazar son acciones locales de demostración.
+      Aceptar y rechazar actualiza el estado en PostgreSQL.
       La cancelación de reservas confirmadas queda pendiente de la política del proyecto.
     </p>
 
@@ -590,7 +550,7 @@ function vistaIngresos() {
 
   return encabezado(
     'Ingresos y ocupación',
-    'Cifras de demostración. No se realizan cobros ni movimientos bancarios.'
+    'Importes registrados en PostgreSQL. Los pagos son simulados.'
   ) + `
     <div class="filtros">
       <label>
@@ -601,7 +561,7 @@ function vistaIngresos() {
 
     <section class="indicadores">
       ${indicador('Importe reservado', moneda(total), 'Histórico: confirmadas y finalizadas')}
-      ${indicador('Pagos simulados', moneda(pagado), 'Importes de ejemplo aprobados')}
+      ${indicador('Pagos simulados', moneda(pagado), 'Pagos simulados aprobados')}
       ${indicador('Noches ocupadas', nochesOcupadas, `Dentro de ${ui.mes}`)}
       ${indicador('Ocupación', `${ocupacion.toFixed(1)} %`, 'Sobre todos los alojamientos registrados')}
     </section>
@@ -648,7 +608,7 @@ function vistaIngresos() {
 function vistaResenas() {
   return encabezado(
     'Reseñas',
-    'Opiniones de ejemplo asociadas a estancias finalizadas.'
+    'Opiniones asociadas a estancias finalizadas.'
   ) + (datos.resenas.length ? `
     <section class="panel">
       ${datos.resenas.map(r => {
@@ -663,19 +623,19 @@ function vistaResenas() {
             <h3>${escapar(alojamiento?.titulo || 'Alojamiento')}</h3>
             <p>${escapar(r.comentario)}</p>
             <small>
-              ${escapar(r.huesped)} · ${fechaTexto(r.fecha)} · Ejemplo
+              ${escapar(r.huesped)} · ${fechaTexto(r.fecha.slice(0,10))}
             </small>
           </article>
         `;
       }).join('')}
     </section>
-  ` : vacio('Todavía no hay reseñas. Puedes cargar los ejemplos.'));
+  ` : vacio('Todavía no hay reseñas.'));
 }
 
 function vistaNotificaciones() {
   return encabezado(
     'Notificaciones',
-    'Cambios realizados dentro de este prototipo.',
+    'Actividad registrada en tu cuenta.',
     '<button id="marcar-leidas" type="button">Marcar todas como leídas</button>'
   ) + (datos.notificaciones.length ? `
     <section class="panel">
@@ -750,7 +710,7 @@ function renderFotos() {
     `).join('');
 }
 
-// Comprime las imágenes para reducir el consumo de localStorage.
+// Comprime las imágenes antes de enviarlas al backend.
 async function comprimirImagen(file) {
   if (!['image/jpeg', 'image/png'].includes(file.type)) {
     throw new Error('Solo se permiten imágenes PNG o JPEG.');
@@ -848,374 +808,68 @@ $('#editor').addEventListener('cancel', event => {
   if (ui.procesandoFotos) event.preventDefault();
 });
 
-$('#form-alojamiento').addEventListener('submit', event => {
+
+$('#form-alojamiento').addEventListener('submit', async event => {
   event.preventDefault();
-
+  const form=event.currentTarget,button=form.querySelector('[type="submit"]');
+  if(ui.procesandoFotos)return mensaje('Espera a que terminen las fotografías.',true);
+  button.disabled=true;
   try {
-    if (ui.procesandoFotos) {
-      throw new Error('Espera a que terminen de procesarse las fotografías.');
-    }
-
-    const form = event.currentTarget;
-    const campos = new FormData(form);
-    const precio = Number(campos.get('precio'));
-    const capacidad = Number(campos.get('capacidad'));
-
-    const titulo = campos.get('titulo').trim();
-    const descripcion = campos.get('descripcion').trim();
-    const ubicacion = campos.get('ubicacion').trim();
-
-    if (!titulo || !descripcion || !ubicacion) {
-      throw new Error('Completa el nombre, la descripción y la ubicación.');
-    }
-
-    if (
-      !Number.isFinite(precio) ||
-      precio <= 0 ||
-      precio > 1000000 ||
-      Math.abs(precio * 100 - Math.round(precio * 100)) > .00001
-    ) {
-      throw new Error('Introduce un precio positivo con hasta dos decimales.');
-    }
-
-    if (!Number.isInteger(capacidad) || capacidad < 1 || capacidad > 100) {
-      throw new Error('La capacidad debe ser un entero entre 1 y 100.');
-    }
-
-    const alojamiento = {
-      id: campos.get('id') || nuevoId(),
-      titulo,
-      descripcion,
-      ubicacion,
-      precioCentavos: Math.round(precio * 100),
-      capacidad,
-      servicios: campos.getAll('servicio'),
-      caracteristicas: campos.get('caracteristicas').trim(),
-      publicado: form.elements.publicado.checked,
-      fotos: [...ui.fotos]
-    };
-
-    actualizarDatos(copia => {
-      const index = copia.alojamientos.findIndex(a => a.id === alojamiento.id);
-
-      if (index >= 0) copia.alojamientos[index] = alojamiento;
-      else copia.alojamientos.push(alojamiento);
-
-      notificar(copia, `Se guardó el alojamiento "${alojamiento.titulo}".`);
-    });
-
-    $('#editor').close();
-    mensaje('Alojamiento guardado en este navegador.');
-  } catch (e) {
-    mensaje(e.message, true);
-  }
+    const b=Object.fromEntries(new FormData(form));
+    const id=b.id;delete b.id;
+    b.servicios=new FormData(form).getAll('servicio');delete b.servicio;
+    b.fotos=ui.fotos;b.publicado=form.elements.publicado.checked;
+    const previous=alojamientoPorId(id);b.categoria=previous?.categoria||'all';
+    await Nomada.api(id?`/api/alojamientos/${id}`:'/api/alojamientos',id?'PUT':'POST',b);
+    $('#editor').close();await cargarDatos();mensaje('Alojamiento guardado en PostgreSQL.');
+  } catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
 });
-
 document.querySelectorAll('[data-vista]').forEach(button => {
-  button.addEventListener('click', () => {
-    ui.vista = button.dataset.vista;
-    render();
-    $('#contenido').focus();
-  });
+ button.addEventListener('click',async()=>{
+  ui.vista=button.dataset.vista;
+  try{await cargarDatos();$('#contenido').focus();}catch(e){mensaje(e.message,true);}
+ });
 });
-
-$('#vista').addEventListener('click', event => {
-  const button = event.target.closest('button');
-  if (!button) return;
-
-  try {
-    if (button.hasAttribute('data-nuevo')) {
-      abrirEditor();
-    }
-
-    if (button.dataset.editar) {
-      abrirEditor(button.dataset.editar);
-    }
-
-    if (button.dataset.calendario) {
-      ui.propiedadCalendario = button.dataset.calendario;
-      ui.vista = 'calendario';
-      render();
-    }
-
-    if (button.dataset.publicar) {
-      actualizarDatos(copia => {
-        const a = copia.alojamientos.find(
-          item => item.id === button.dataset.publicar
-        );
-
-        a.publicado = !a.publicado;
-
-        notificar(
-          copia,
-          `"${a.titulo}" fue ${a.publicado ? 'publicado' : 'desactivado'} en el prototipo.`
-        );
-      });
-
-      mensaje('Estado de publicación actualizado.');
-    }
-
-    if (button.dataset.liberar) {
-      if (!confirm('¿Liberar este periodo?')) return;
-
-      actualizarDatos(copia => {
-        copia.bloqueos = copia.bloqueos.filter(
-          b => b.id !== button.dataset.liberar
-        );
-
-        notificar(copia, 'Se liberó un periodo del calendario.');
-      });
-
-      mensaje('Periodo liberado.');
-    }
-
-    if (button.dataset.reserva) {
-      const reserva = datos.reservas.find(
-        r => r.id === button.dataset.reserva
-      );
-
-      const siguiente = button.dataset.estado;
-
-      const valido =
-        (
-          reserva?.estado === 'pendiente' &&
-          ['confirmada', 'rechazada'].includes(siguiente)
-        ) ||
-        (
-          reserva?.estado === 'confirmada' &&
-          siguiente === 'finalizada' &&
-          reserva.salida <= hoy()
-        );
-
-      if (!valido) throw new Error('El cambio de estado no está permitido.');
-
-      if (!confirm(`¿Cambiar la reservación de ejemplo a "${siguiente}"?`)) {
-        return;
-      }
-
-      actualizarDatos(copia => {
-        const r = copia.reservas.find(item => item.id === reserva.id);
-        r.estado = siguiente;
-
-        notificar(
-          copia,
-          `Reservación de ejemplo de ${r.huesped}: ${siguiente}.`
-        );
-      });
-
-      mensaje('Reservación de ejemplo actualizada.');
-    }
-
-    if (button.id === 'marcar-leidas') {
-      actualizarDatos(copia => {
-        copia.notificaciones.forEach(n => { n.leida = true; });
-      });
-
-      mensaje('Notificaciones marcadas como leídas.');
-    }
-  } catch (e) {
-    mensaje(e.message, true);
-  }
+$('#vista').addEventListener('click',async event=>{
+ const button=event.target.closest('button');if(!button)return;
+ try {
+  if(button.hasAttribute('data-nuevo'))return abrirEditor();
+  if(button.dataset.editar)return abrirEditor(button.dataset.editar);
+  if(button.dataset.calendario){ui.propiedadCalendario=button.dataset.calendario;ui.vista='calendario';return render();}
+  button.disabled=true;
+  if(button.dataset.publicar){
+   const a=alojamientoPorId(button.dataset.publicar);
+   await Nomada.api(`/api/alojamientos/${a.id}`,'PUT',{...a,precio:a.precioCentavos/100,publicado:!a.publicado});
+  }else if(button.dataset.liberar){
+   if(!confirm('¿Liberar este periodo?'))return;
+   await Nomada.api(`/api/bloqueos/${button.dataset.liberar}`,'DELETE');
+  }else if(button.dataset.reserva){
+   if(!confirm(`¿Cambiar a ${button.dataset.estado}?`))return;
+   await Nomada.api(`/api/reservas/${button.dataset.reserva}/estado`,'PATCH',{estado:button.dataset.estado});
+  }else if(button.id==='marcar-leidas')await Nomada.api('/api/notificaciones','PATCH',{});
+  else return;
+  await cargarDatos();mensaje('Operación guardada.');
+ }catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
 });
-
-$('#vista').addEventListener('change', event => {
-  const input = event.target;
-
-  if (input.id === 'cal-alojamiento') {
-    ui.propiedadCalendario = input.value;
-  } else if (['cal-mes', 'ingresos-mes'].includes(input.id)) {
-    if (!/^\d{4}-\d{2}$/.test(input.value)) return;
-    ui.mes = input.value;
-  } else if (input.id === 'filtro-reserva') {
-    ui.estadoReserva = input.value;
-  } else {
-    return;
-  }
-
-  render();
+$('#vista').addEventListener('change',event=>{
+ const input=event.target;
+ if(input.id==='cal-alojamiento')ui.propiedadCalendario=input.value;
+ else if(['cal-mes','ingresos-mes'].includes(input.id)){if(!/^\d{4}-\d{2}$/.test(input.value))return;ui.mes=input.value;}
+ else if(input.id==='filtro-reserva')ui.estadoReserva=input.value;
+ else return;render();
 });
-
-$('#vista').addEventListener('submit', event => {
-  event.preventDefault();
-
-  try {
-    const form = event.target;
-    const campos = new FormData(form);
-
-    if (form.id === 'form-busqueda') {
-      ui.busqueda = campos.get('busqueda').trim();
-      render();
-      return;
-    }
-
-    if (form.id !== 'form-bloqueo') return;
-
-    const entrada = campos.get('entrada');
-    const salida = campos.get('salida');
-    const alojamientoId = ui.propiedadCalendario;
-
-    if (
-      !fechaValida(entrada) ||
-      !fechaValida(salida) ||
-      entrada < hoy() ||
-      salida <= entrada
-    ) {
-      throw new Error('Selecciona un periodo futuro válido, con salida posterior a la entrada.');
-    }
-
-    const ocupado = datos.reservas.some(r =>
-      r.alojamientoId === alojamientoId &&
-      ['pendiente', 'confirmada'].includes(r.estado) &&
-      r.entrada < salida &&
-      r.salida > entrada
-    );
-
-    const bloqueado = datos.bloqueos.some(b =>
-      b.alojamientoId === alojamientoId &&
-      b.entrada < salida &&
-      b.salida > entrada
-    );
-
-    if (ocupado || bloqueado) {
-      throw new Error('El periodo se superpone con un bloqueo, solicitud o reserva.');
-    }
-
-    actualizarDatos(copia => {
-      copia.bloqueos.push({
-        id: nuevoId(),
-        alojamientoId,
-        entrada,
-        salida
-      });
-
-      notificar(copia, `Se bloquearon fechas del ${entrada} al ${salida}.`);
-    });
-
-    mensaje('Bloqueo guardado.');
-  } catch (e) {
-    mensaje(e.message, true);
-  }
+$('#vista').addEventListener('submit',async event=>{
+ event.preventDefault();const form=event.target,b=Object.fromEntries(new FormData(form));
+ if(form.id==='form-busqueda'){ui.busqueda=b.busqueda.trim();return render();}
+ if(form.id!=='form-bloqueo')return;
+ const button=form.querySelector('button');button.disabled=true;
+ try{b.alojamientoId=ui.propiedadCalendario;await Nomada.api('/api/bloqueos','POST',b);await cargarDatos();mensaje('Bloqueo guardado.');}
+ catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
 });
-
-$('#cargar-demo').addEventListener('click', () => {
-  try {
-    if (datos.demoCargada) {
-      mensaje('Los ejemplos ya fueron cargados. Tus cambios se conservan.');
-      return;
-    }
-
-    if (!confirm('¿Agregar alojamientos y reservaciones ficticias? Tus datos actuales se conservarán.')) {
-      return;
-    }
-
-    actualizarDatos(copia => {
-      const casaId = nuevoId();
-      const depaId = nuevoId();
-
-      copia.alojamientos.push(
-        {
-          id: casaId,
-          titulo: 'Casa del bosque · Ejemplo',
-          descripcion: 'Casa de demostración con jardín y espacios para descansar.',
-          ubicacion: 'Valle de Bravo, Estado de México',
-          precioCentavos: 185000,
-          capacidad: 4,
-          servicios: ['Wi-Fi', 'Cocina', 'Jardín'],
-          caracteristicas: 'Terraza y comedor exterior.',
-          publicado: true,
-          fotos: []
-        },
-        {
-          id: depaId,
-          titulo: 'Departamento central · Ejemplo',
-          descripcion: 'Departamento de demostración cerca del centro.',
-          ubicacion: 'Toluca, Estado de México',
-          precioCentavos: 95000,
-          capacidad: 2,
-          servicios: ['Wi-Fi', 'Cocina', 'Estacionamiento'],
-          caracteristicas: 'Área de trabajo.',
-          publicado: false,
-          fotos: []
-        }
-      );
-
-      const ejemplos = [
-        {
-          alojamientoId: casaId,
-          huesped: 'Mariana · Ejemplo',
-          inicio: 3,
-          duracion: 3,
-          personas: 2,
-          estado: 'pendiente',
-          pago: 'pendiente',
-          precio: 185000
-        },
-        {
-          alojamientoId: casaId,
-          huesped: 'Diego · Ejemplo',
-          inicio: 10,
-          duracion: 4,
-          personas: 4,
-          estado: 'confirmada',
-          pago: 'aprobado',
-          precio: 185000
-        },
-        {
-          alojamientoId: casaId,
-          huesped: 'Sofía · Ejemplo',
-          inicio: -9,
-          duracion: 3,
-          personas: 2,
-          estado: 'finalizada',
-          pago: 'aprobado',
-          precio: 185000
-        },
-        {
-          alojamientoId: depaId,
-          huesped: 'Luis · Ejemplo',
-          inicio: 5,
-          duracion: 2,
-          personas: 1,
-          estado: 'cancelada',
-          pago: 'pendiente',
-          precio: 95000
-        }
-      ];
-
-      ejemplos.forEach(e => {
-        const entrada = sumarDias(hoy(), e.inicio);
-
-        copia.reservas.push({
-          id: nuevoId(),
-          alojamientoId: e.alojamientoId,
-          huesped: e.huesped,
-          entrada,
-          salida: sumarDias(entrada, e.duracion),
-          personas: e.personas,
-          estado: e.estado,
-          pago: e.pago,
-          totalCentavos: e.precio * e.duracion
-        });
-      });
-
-      copia.resenas.push({
-        id: nuevoId(),
-        alojamientoId: casaId,
-        huesped: 'Sofía · Ejemplo',
-        puntuacion: 5,
-        comentario: 'Opinión ficticia: un espacio tranquilo, limpio y cómodo.',
-        fecha: sumarDias(hoy(), -5)
-      });
-
-      copia.demoCargada = true;
-      notificar(copia, 'Se cargaron datos ficticios para demostrar el panel.');
-    });
-
-    mensaje('Ejemplos cargados sin reemplazar tus alojamientos.');
-  } catch (e) {
-    mensaje(e.message, true);
-  }
-});
-
-cargarDatos();
-render();
+$('#cargar-demo').addEventListener('click',()=>Nomada.logout().catch(e=>mensaje(e.message,true)));
+document.querySelector('main').hidden=true;
+document.querySelector('aside').hidden=true;
+Nomada.require('anfitrion').then(async user=>{
+ document.querySelector('.sidebar-pie strong').textContent=user.nombre;
+ await cargarDatos();document.querySelector('main').hidden=false;document.querySelector('aside').hidden=false;
+}).catch(e=>mensaje(e.message,true));

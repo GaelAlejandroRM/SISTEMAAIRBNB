@@ -1,0 +1,14 @@
+{
+  "name": "nomada-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend compartido y frontend conectado de Nómada",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file=.env backend/server.js",
+    "migrate": "node --env-file=.env backend/migrate.js",
+    "admin": "node --env-file=.env backend/create-admin.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": { "pg": "^8.16.3" }
+}

@@ -10,3 +10,10 @@ desktop.ini
 # Environment & Temp Files
 *.tmp
 *.log
+
+node_modules/
+.env
+.env.*
+!.env.example
+cloud-sql-proxy*.exe
+outbox/

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nomada | Acceso</title><link rel="stylesheet" href="css/anfitrion.css"><script src="js/api.js" defer></script><script src="js/acceso.js" defer></script></head>
+<body><main style="margin:40px auto;max-width:520px;padding:20px">
+<a class="marca" href="index.html">nomada</a><h1>Acceso a tu cuenta</h1>
+<p>Los datos se guardan en PostgreSQL. No se realizan cobros reales.</p>
+<p id="resultado" role="status"></p>
+<section class="panel"><h2>Iniciar sesión</h2><form id="login">
+<label>Correo<input type="email" name="email" autocomplete="username" required></label>
+<label>Contraseña<input type="password" name="password" autocomplete="current-password" maxlength="128" required></label>
+<button class="primario" type="submit">Entrar</button></form></section>
+<section class="panel"><h2>Crear cuenta</h2><form id="registro">
+<label>Nombre<input name="nombre" maxlength="120" required></label>
+<label>Correo<input type="email" name="email" autocomplete="email" required></label>
+<label>Contraseña<input type="password" name="password" minlength="12" maxlength="128" autocomplete="new-password" required></label>
+<label>Tipo de cuenta<select name="rol"><option value="huesped">Huésped</option><option value="anfitrion">Anfitrión</option></select></label>
+<button class="primario" type="submit">Crear cuenta</button></form></section>
+<p>La recuperación por correo se implementará cuando se configure el proveedor de correo.</p>
+</main></body></html>
