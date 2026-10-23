@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Panel de anfitrión de Nómada">
+  <title>Nómada | Anfitrión</title>
+
+  <link rel="stylesheet" href="css/anfitrion.css">
+  <script src="js/api.js" defer></script>
+  <script src="js/anfitrion.js" defer></script>
+</head>
+
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <aside class="sidebar">
+    <a class="marca" href="index.html">
+      nómada
+      <span>ESPACIO DEL ANFITRIÓN</span>
+    </a>
+
+    <nav aria-label="Navegación del anfitrión">
+      <button type="button" data-vista="resumen">◫ Resumen</button>
+      <button type="button" data-vista="alojamientos">⌂ Mis alojamientos</button>
+      <button type="button" data-vista="calendario">▦ Calendario</button>
+      <button type="button" data-vista="reservas">▤ Reservaciones</button>
+      <button type="button" data-vista="ingresos">$ Ingresos</button>
+      <button type="button" data-vista="resenas">☆ Reseñas</button>
+      <button type="button" data-vista="notificaciones">○ Notificaciones</button>
+    </nav>
+
+    <div class="sidebar-pie">
+      <div class="avatar" aria-hidden="true">A</div>
+      <div>
+        <strong>Anfitrión</strong>
+        <small>Cuenta autenticada</small>
+      </div>
+    </div>
+  </aside>
+
+  <main id="contenido" tabindex="-1">
+    <header class="barra-superior">
+      <span>Tu espacio de anfitrión</span>
+      <a href="index.html">Volver al inicio ↗</a>
+    </header>
+
+    <div class="aviso-demo">
+      <span>
+        <strong>Anfitrión conectado a PostgreSQL.</strong>
+        Tus alojamientos y solicitudes se guardan en el backend compartido.
+      </span>
+
+      <button id="cargar-demo" type="button">
+        Cerrar sesión
+      </button>
+    </div>
+
+    <div id="vista"></div>
+  </main>
+
+  <div id="mensaje" role="status" aria-live="polite" hidden></div>
+
+  <dialog id="editor">
+    <form id="form-alojamiento">
+      <div class="encabezado-modal">
+        <div>
+          <p class="etiqueta">MIS ALOJAMIENTOS</p>
+          <h2 id="titulo-editor">Nuevo alojamiento</h2>
+        </div>
+
+        <button
+          id="cerrar-editor"
+          class="boton-icono"
+          type="button"
+          aria-label="Cerrar formulario"
+        >✕</button>
+      </div>
+
+      <p class="texto-secundario">Los campos con * son obligatorios.</p>
+
+      <input name="id" type="hidden">
+
+      <label>
+        Nombre del alojamiento *
+        <input
+          name="titulo"
+          maxlength="120"
+          placeholder="Ej. Casa con jardín en Valle de Bravo"
+          required
+        >
+      </label>
+
+      <label>
+        Descripción *
+        <textarea
+          name="descripcion"
+          maxlength="5000"
+          rows="4"
+          placeholder="Describe tu espacio y lo que lo hace especial."
+          required
+        ></textarea>
+      </label>
+
+      <label>
+        Ubicación *
+        <input
+          name="ubicacion"
+          maxlength="300"
+          placeholder="Ciudad, estado y dirección"
+          required
+        >
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Precio por noche, MXN *
+          <input
+            name="precio"
+            type="number"
+            min="0.01"
+            max="1000000"
+            step="0.01"
+            required
+          >
+        </label>
+
+        <label>
+          Capacidad de huéspedes *
+          <input
+            name="capacidad"
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            required
+          >
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>Servicios y características</legend>
+
+        <div class="servicios">
+          <label><input type="checkbox" name="servicio" value="Wi-Fi"> Wi-Fi</label>
+          <label><input type="checkbox" name="servicio" value="Cocina"> Cocina</label>
+          <label><input type="checkbox" name="servicio" value="Estacionamiento"> Estacionamiento</label>
+          <label><input type="checkbox" name="servicio" value="Alberca"> Alberca</label>
+          <label><input type="checkbox" name="servicio" value="Jardín"> Jardín</label>
+          <label><input type="checkbox" name="servicio" value="Aire acondicionado"> Aire acondicionado</label>
+        </div>
+      </fieldset>
+
+      <label>
+        Otras características
+        <textarea name="caracteristicas" maxlength="2000" rows="2"></textarea>
+      </label>
+
+      <label>
+        Fotografías
+        <input id="fotos" type="file" accept="image/png,image/jpeg" multiple>
+        <small>
+          Hasta 5 fotografías. Se comprimen para guardarlas en el navegador.
+        </small>
+      </label>
+
+      <div id="fotos-preview" class="fotos-preview"></div>
+
+      <label class="check-publicar">
+        <input name="publicado" type="checkbox">
+        Publicar alojamiento
+      </label>
+
+      <p class="texto-secundario">
+        En este prototipo, publicar cambia el estado visual del alojamiento.
+      </p>
+
+      <div class="acciones-modal">
+        <button id="cancelar-editor" type="button">Cancelar</button>
+        <button class="primario" type="submit">Guardar alojamiento</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
