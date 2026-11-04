@@ -6,10 +6,6 @@
  * Conectado al backend compartido y PostgreSQL
  */
 
-const CLAVE_ANFITRION = 'nomada_anfitrion_front_v1';
-const CLAVE_FAVORITOS = 'nomada_huesped_favoritos_v1';
-const CLAVE_PERFIL = 'nomada_huesped_perfil_v1';
-const CLAVE_NOTIF_HUESPED = 'nomada_huesped_notificaciones_v1';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => document.querySelectorAll(selector);
@@ -43,6 +39,8 @@ let notificacionesHuesped = [];
 // Estado de UI del módulo de huésped
 const ui = {
   vista: 'explorar',
+  pagina: 0,
+  haySiguiente: false,
   filtroDestino: '',
   filtroLlegada: '',
   filtroSalida: '',
@@ -137,7 +135,9 @@ function obtenerFotoAlojamiento(alojamiento, indice = 0) {
 }
 
 function calcularCalificacionAlojamiento(alojamientoId) {
-  const resenas = datos.resenas.filter(r => r.alojamientoId === alojamientoId);
+  const alojamiento=datos.alojamientos.find(a=>a.id===alojamientoId);
+  if(alojamiento && Number(alojamiento.resenas)>0)return {promedio:Number(alojamiento.calificacion).toFixed(1),total:Number(alojamiento.resenas),nueva:false};
+  const resenas = datos.resenas.filter(r => r.alojamientoId === alojamientoId && r.visible!==false);
   if (!resenas.length) {
     return { promedio: 5.0, total: 0, nueva: true };
   }
@@ -153,13 +153,18 @@ function calcularCalificacionAlojamiento(alojamientoId) {
    ALMACENAMIENTO Y SINCRONIZACIÓN
    ========================================================================== */
 
-let disponibles=null;
+const TAMANO_PAGINA=20;
+let catalogo=[],cargaSecuencia=0;
 async function cargarDatos() {
-  datos=await Nomada.api('/api/huesped/panel');
-  favoritos=datos.favoritos;perfil=datos.perfil;notificacionesHuesped=datos.notificaciones;
-  const p=new URLSearchParams({personas:ui.filtroHuespedes,q:ui.filtroDestino});
+  const sequence=++cargaSecuencia;
+  const p=new URLSearchParams({personas:ui.filtroHuespedes,q:ui.filtroDestino,limit:TAMANO_PAGINA+1,offset:ui.pagina*TAMANO_PAGINA});
+  if(ui.filtroServicio!=='todos')p.set('servicio',ui.filtroServicio);
   if(ui.filtroLlegada||ui.filtroSalida){p.set('entrada',ui.filtroLlegada);p.set('salida',ui.filtroSalida);}
-  disponibles=new Set((await Nomada.api('/api/alojamientos?'+p)).map(a=>a.id));
+  const [panel,resultados]=await Promise.all([Nomada.api('/api/huesped/panel'),Nomada.api('/api/alojamientos?'+p)]);
+  if(sequence!==cargaSecuencia)return;
+  datos=panel;ui.haySiguiente=resultados.length>TAMANO_PAGINA;catalogo=resultados.slice(0,TAMANO_PAGINA);
+  datos.alojamientos=[...new Map([...datos.alojamientos,...catalogo].map(a=>[a.id,a])).values()];
+  favoritos=datos.favoritos;perfil=datos.perfil;notificacionesHuesped=datos.notificaciones;
   actualizarInfoSidebar();actualizarBadgesNav();render();
 }
 function actualizarInfoSidebar() {
@@ -199,29 +204,10 @@ function actualizarBadgesNav() {
 
 // VISTA 1: EXPLORAR ESTANCIAS
 function vistaExplorar() {
-  const destinoBusqueda = ui.filtroDestino.trim().toLowerCase();
-  const filtroServicio = ui.filtroServicio;
+  // Los filtros se aplican en PostgreSQL antes de paginar.
 
   // Filtrar alojamientos que estén publicados y cumplan con los criterios
-  let alojamientos = datos.alojamientos.filter(a => a.publicado !== false && (!disponibles || disponibles.has(a.id)));
-
-  if (destinoBusqueda) {
-    alojamientos = alojamientos.filter(a =>
-      (a.titulo || '').toLowerCase().includes(destinoBusqueda) ||
-      (a.ubicacion || '').toLowerCase().includes(destinoBusqueda) ||
-      (a.descripcion || '').toLowerCase().includes(destinoBusqueda)
-    );
-  }
-
-  if (ui.filtroHuespedes > 1) {
-    alojamientos = alojamientos.filter(a => (a.capacidad || 1) >= ui.filtroHuespedes);
-  }
-
-  if (filtroServicio && filtroServicio !== 'todos') {
-    alojamientos = alojamientos.filter(a =>
-      Array.isArray(a.servicios) && a.servicios.includes(filtroServicio)
-    );
-  }
+  let alojamientos = catalogo.filter(a => a.publicado !== false);
 
   const serviciosDisponibles = ['todos', 'Wi-Fi', 'Alberca', 'Cocina', 'Estacionamiento', 'Jardín', 'Aire acondicionado'];
 
@@ -396,6 +382,7 @@ function vistaExplorar() {
         <button type="button" class="primario" id="btn-reset-filtros">Ver todos los alojamientos</button>
       </div>
     `}
+    <div class="acciones" aria-label="Paginación de alojamientos"><button type="button" data-catalogo-pagina="anterior" ${ui.pagina===0?'disabled':''}>Anterior</button><span>Página ${ui.pagina+1}</span><button type="button" data-catalogo-pagina="siguiente" ${!ui.haySiguiente?'disabled':''}>Siguiente</button></div>
   `;
 }
 
@@ -899,8 +886,9 @@ function render() {
 /* ==========================================================================
    MODAL: DETALLES DE ALOJAMIENTO Y COTIZADOR DE RESERVAS
    ========================================================================== */
-function abrirDetalleAlojamiento(alojamientoId) {
-  const a = datos.alojamientos.find(item => item.id === alojamientoId);
+async function abrirDetalleAlojamiento(alojamientoId) {
+  const a=await Nomada.api(`/api/alojamientos/${alojamientoId}`);
+  const index=datos.alojamientos.findIndex(item=>item.id===a.id);if(index>=0)datos.alojamientos[index]=a;
   if (!a) {
     mensaje('Alojamiento no encontrado.', true);
     return;
@@ -912,7 +900,7 @@ function abrirDetalleAlojamiento(alojamientoId) {
   const foto2 = obtenerFotoAlojamiento(a, 1);
   const foto3 = obtenerFotoAlojamiento(a, 2);
   const calif = calcularCalificacionAlojamiento(a.id);
-  const resenasAlojamiento = datos.resenas.filter(r => r.alojamientoId === a.id);
+  const resenasAlojamiento=(a.opiniones||[]).map(r=>({...r,fecha:String(r.fecha).slice(0,10)}));
 
   // Fechas por defecto: mañana por 3 noches
   const fechaLlegadaDefecto = ui.filtroLlegada || sumarDias(hoy(), 1);
@@ -997,6 +985,7 @@ function abrirDetalleAlojamiento(alojamientoId) {
         </div>
       </div>
 
+      <p id="estado-disponibilidad" role="status" aria-live="polite">Consultando disponibilidad…</p>
       <form id="form-reservar-estancia">
         <input type="hidden" name="alojamientoId" value="${escapar(a.id)}">
 
@@ -1103,27 +1092,22 @@ function abrirDetalleAlojamiento(alojamientoId) {
   const inputLlegada = $('#res-llegada');
   const inputSalida = $('#res-salida');
 
-  function actualizarCalculoCostos() {
-    const llegadaVal = inputLlegada.value;
-    const salidaVal = inputSalida.value;
-    const n = noches(llegadaVal, salidaVal);
-
-    if (n <= 0) {
-      $('#costo-noches-label').textContent = 'Fechas inválidas';
-      $('#costo-noches-valor').textContent = '$0.00';
-      $('#costo-tarifa-valor').textContent = '$0.00';
-      $('#costo-total-valor').textContent = '$0.00';
-      return;
-    }
-
-    const sub = a.precioCentavos * n;
-    const tarifa = Math.round(sub * datos.serviceFeeBps / 10000);
-    const tot = sub + tarifa;
-
-    $('#costo-noches-label').textContent = `${moneda(a.precioCentavos)} x ${n} noche${n === 1 ? '' : 's'}`;
-    $('#costo-noches-valor').textContent = moneda(sub);
-    $('#costo-tarifa-valor').textContent = moneda(tarifa);
-    $('#costo-total-valor').textContent = moneda(tot);
+  let cotizacionSecuencia=0;
+  async function actualizarCalculoCostos() {
+    const sequence=++cotizacionSecuencia;
+    const button=$('#form-reservar-estancia [type="submit"]');button.disabled=true;
+    const status=$('#estado-disponibilidad');status.textContent='Consultando disponibilidad…';
+    try{
+      const params=new URLSearchParams({entrada:inputLlegada.value,salida:inputSalida.value,personas:$('#res-personas').value});
+      const quote=await Nomada.api(`/api/alojamientos/${a.id}/disponibilidad?${params}`);
+      if(sequence!==cotizacionSecuencia||!status.isConnected)return false;
+      $('#costo-noches-label').textContent=`${moneda(quote.precioNocheCentavos)} x ${quote.noches} noches`;
+      $('#costo-noches-valor').textContent=moneda(quote.subtotalCentavos);
+      $('#costo-tarifa-valor').textContent=moneda(quote.tarifaCentavos);
+      $('#costo-total-valor').textContent=moneda(quote.totalCentavos);
+      status.textContent=quote.disponible?'Disponible para estas fechas. La disponibilidad se validará nuevamente al registrar.':'No disponible para estas fechas o cantidad de huéspedes.';
+      button.disabled=!quote.disponible;return quote.disponible;
+    }catch(e){if(sequence===cotizacionSecuencia&&status.isConnected)status.textContent=e.message;return false;}
   }
 
   inputLlegada.addEventListener('change', () => {
@@ -1135,6 +1119,7 @@ function abrirDetalleAlojamiento(alojamientoId) {
   });
 
   inputSalida.addEventListener('change', actualizarCalculoCostos);
+  $('#res-personas').addEventListener('change',actualizarCalculoCostos);
 
   // Manejador del formulario de reserva
 
@@ -1143,6 +1128,7 @@ function abrirDetalleAlojamiento(alojamientoId) {
   form.addEventListener('submit',async event=>{
     event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;
     try{
+      if(!await actualizarCalculoCostos())return;button.disabled=true;
       const b={alojamientoId:a.id,entrada:form.elements.llegada.value,salida:form.elements.salida.value,personas:form.elements.personas.value,notas:form.elements.notas.value};
       const next=JSON.stringify(b);if(next!==signature){key=crypto.randomUUID();signature=next;}
       b.claveOperacion=key;
@@ -1152,13 +1138,14 @@ function abrirDetalleAlojamiento(alojamientoId) {
   });
 
   $('#modal-detalle').showModal();
+  actualizarCalculoCostos();
 }
 
 /* ==========================================================================
    MODAL: COMPROBANTE / VOUCHER DE VIAJE
    ========================================================================== */
-function abrirVoucher(reservaId) {
-  const r = datos.reservas.find(item => item.id === reservaId);
+async function abrirVoucher(reservaId) {
+  const r=await Nomada.api(`/api/reservas/${reservaId}/comprobante`);
   if (!r) {
     mensaje('Reservación no encontrada.', true);
     return;
@@ -1175,7 +1162,7 @@ function abrirVoucher(reservaId) {
       <div class="ticket-header">
         <div>
           <span class="etiqueta" style="color: #cce8dd; margin: 0;">NÓMADA HOSPEDAJE</span>
-          <h3>${escapar(a?.titulo || 'Alojamiento')}</h3>
+          <h3>${escapar(r.titulo || a?.titulo || 'Alojamiento')}</h3>
         </div>
         <span class="ticket-codigo">NOM-${codigoReserva}</span>
       </div>
@@ -1183,7 +1170,7 @@ function abrirVoucher(reservaId) {
       <div class="ticket-cuerpo">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span class="estado ${escapar(r.estado)}">Estado: ${escapar(r.estado)}</span>
-          <span class="texto-secundario" style="font-size: 12px;">Operación con pago simulado</span>
+          <span class="texto-secundario" style="font-size: 12px;">Pago simulado: ${escapar(r.pago)}</span>
         </div>
 
         <div class="ticket-seccion-fechas">
@@ -1233,7 +1220,7 @@ function abrirVoucher(reservaId) {
 
         <div class="ticket-pie-total">
           <div>
-            <strong style="font-size: 16px;">Total pagado (simulado)</strong>
+            <strong style="font-size: 16px;">Importe reservado</strong>
             <small class="texto-secundario" style="display: block;">Importe registrado al solicitar la reserva</small>
           </div>
           <strong style="font-size: 20px; color: var(--verde);">${moneda(r.totalCentavos)}</strong>
@@ -1241,8 +1228,9 @@ function abrirVoucher(reservaId) {
       </div>
     </div>
 
+    <p><strong>Importe pagado (simulado): ${moneda(r.importePagadoCentavos)}</strong><br>Estado del pago: ${escapar(r.pago)}. ${r.pago==='aprobado'?'No se efectuó un cobro bancario real.':'Este resumen no acredita un pago aprobado.'}</p>
     <div class="ticket-acciones">
-      <button type="button" class="secundario-btn" onclick="window.print()">
+      <button type="button" class="secundario-btn" id="imprimir-comprobante">
         🖨 Imprimir comprobante
       </button>
       <button type="button" class="primario" id="btn-cerrar-voucher-dialog">
@@ -1251,6 +1239,7 @@ function abrirVoucher(reservaId) {
     </div>
   `;
 
+  $('#imprimir-comprobante').addEventListener('click',()=>window.print());
   $('#btn-cerrar-voucher-dialog')?.addEventListener('click', () => {
     $('#modal-voucher').close();
   });
@@ -1316,14 +1305,15 @@ function setupEventListeners() {
       if(button.hasAttribute('data-ir-explorar')){ui.vista='explorar';return await cargarDatos();}
       if(button.dataset.vistaBtn){ui.vista=button.dataset.vistaBtn;return await cargarDatos();}
       if(button.dataset.toggleFav){const id=button.dataset.toggleFav;await Nomada.api(`/api/favoritos/${id}`,favoritos.includes(id)?'DELETE':'PUT');return await cargarDatos();}
-      if(button.dataset.verDetalle)return abrirDetalleAlojamiento(button.dataset.verDetalle);
-      if(button.dataset.verVoucher){await Nomada.api(`/api/reservas/${button.dataset.verVoucher}/comprobante`);return abrirVoucher(button.dataset.verVoucher);}
+      if(button.dataset.verDetalle)return await abrirDetalleAlojamiento(button.dataset.verDetalle);
+      if(button.dataset.verVoucher)return await abrirVoucher(button.dataset.verVoucher);
       if(button.dataset.cancelarReserva){if(!confirm('¿Cancelar esta solicitud pendiente?'))return;await Nomada.api(`/api/reservas/${button.dataset.cancelarReserva}/estado`,'PATCH',{estado:'cancelada'});return await cargarDatos();}
       if(button.dataset.pagar){await Nomada.api(`/api/reservas/${button.dataset.pagar}/pago`,'POST',{resultado:button.dataset.resultado});await cargarDatos();return mensaje('Pago simulado guardado. No se efectuó un cobro real.');}
       if(button.dataset.abrirResena)return abrirModalResena(button.dataset.abrirResena);
       if(button.dataset.pestana){ui.pestanaViajes=button.dataset.pestana;return render();}
-      if(button.dataset.servicio){ui.filtroServicio=button.dataset.servicio;return render();}
-      if(['limpiar-busqueda','btn-reset-filtros'].includes(button.id)){ui.filtroDestino='';ui.filtroLlegada='';ui.filtroSalida='';ui.filtroHuespedes=1;ui.filtroServicio='todos';return await cargarDatos();}
+      if(button.dataset.servicio){ui.filtroServicio=button.dataset.servicio;ui.pagina=0;return await cargarDatos();}
+      if(button.dataset.catalogoPagina){ui.pagina=Math.max(0,ui.pagina+(button.dataset.catalogoPagina==='siguiente'?1:-1));return await cargarDatos();}
+      if(['limpiar-busqueda','btn-reset-filtros'].includes(button.id)){ui.pagina=0;ui.filtroDestino='';ui.filtroLlegada='';ui.filtroSalida='';ui.filtroHuespedes=1;ui.filtroServicio='todos';return await cargarDatos();}
       if(button.id==='vaciar-favoritos'){if(!confirm('¿Vaciar tus favoritos?'))return;for(const id of favoritos)await Nomada.api(`/api/favoritos/${id}`,'DELETE');return await cargarDatos();}
       if(button.id==='marcar-todas-leidas'){await Nomada.api('/api/notificaciones','PATCH',{});return await cargarDatos();}
     }catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
@@ -1332,7 +1322,7 @@ function setupEventListeners() {
     event.preventDefault();const form=event.target,button=form.querySelector('[type="submit"]');if(button)button.disabled=true;
     try{
       if(form.id==='form-busqueda-huesped'){
-        ui.filtroDestino=form.elements.destino.value.trim();ui.filtroLlegada=form.elements.llegada.value;ui.filtroSalida=form.elements.salida.value;ui.filtroHuespedes=Number(form.elements.huespedes.value);await cargarDatos();
+        ui.pagina=0;ui.filtroDestino=form.elements.destino.value.trim();ui.filtroLlegada=form.elements.llegada.value;ui.filtroSalida=form.elements.salida.value;ui.filtroHuespedes=Number(form.elements.huespedes.value);await cargarDatos();
       }else if(form.id==='form-perfil-huesped'){
         await Nomada.api('/api/perfil','PUT',Object.fromEntries(new FormData(form)));await cargarDatos();mensaje('Perfil guardado.');
       }

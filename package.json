@@ -2,13 +2,19 @@
   "name": "nomada-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Backend compartido y frontend conectado de Nómada",
-  "engines": { "node": ">=22" },
+  "description": "Backend compartido y frontend conectado de NÃ³mada",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node --env-file=.env backend/server.js",
     "migrate": "node --env-file=.env backend/migrate.js",
     "admin": "node --env-file=.env backend/create-admin.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "mail:work": "node --env-file=.env backend/mail-worker.js"
   },
-  "dependencies": { "pg": "^8.16.3" }
+  "dependencies": {
+    "nodemailer": "^10.3.1",
+    "pg": "^8.16.3"
+  }
 }

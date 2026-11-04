@@ -8,6 +8,8 @@ GRANT SELECT, INSERT, UPDATE ON users, listings, reservations, payments,
 GRANT SELECT, INSERT, DELETE ON sessions TO nomada_app;
 GRANT SELECT, INSERT, DELETE ON favorites TO nomada_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON calendar TO nomada_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON password_resets TO nomada_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON recovery_mail_jobs TO nomada_app;
 GRANT SELECT, INSERT ON audit TO nomada_app;
 GRANT USAGE, SELECT ON SEQUENCE audit_id_seq TO nomada_app;
 -- No se otorgan DELETE sobre usuarios, reservas o pagos, ni UPDATE/DELETE

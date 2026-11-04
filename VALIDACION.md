@@ -1,5 +1,9 @@
 # Validación de la entrega
 
+Las secciones iniciales conservan resultados históricos. El estado vigente de la
+revisión R2 se resume al final y en CAMBIOS_R2.md; los pendientes anteriores no
+representan necesariamente funciones ausentes del código actual.
+
 Fecha: 22 de octubre de 2026.
 Rama fuente: modulo-huesped, commit f4100e5.
 
@@ -60,3 +64,50 @@ La validación anterior se realizó en la entrega independiente. Posteriormente,
 el código se integró en la carpeta Git SISTEMAAIRBNB y el frontend anterior se
 respaldó fuera del repositorio. Esta reorganización no ejecuta migraciones ni
 modifica datos remotos. No hubo push, merge ni PR durante la reorganización.
+
+## Módulo administrador del 29 de octubre de 2026
+
+Se ejecutó la batería completa en PostgreSQL local aislado con la cuenta de
+permisos limitados: 16 pruebas aprobadas, 0 fallidas, incluyendo los cuatro casos
+de configuración de Cloud Run preparados en una tarea anterior. Se ampliaron
+los casos administrativos con búsquedas, filtros, resumen y moderación de reseñas.
+
+En Microsoft Edge automatizado se verificaron login y redirección a admin.html,
+resumen, desactivación/reactivación de cuenta, cambio de rol, ocultamiento y
+restauración de alojamiento, moderación de reseña, consulta de reservas, pagos,
+bitácora y detalles. También se comprobó rechazo sin sesión y que un comentario
+con HTML se muestra como texto sin crear elementos de imagen. No se registraron
+errores JavaScript no controlados. Se inspeccionó una captura de escritorio y
+la disposición móvil de 390 píxeles, sin desborde horizontal global.
+
+Las pruebas crearon únicamente fixtures ficticios en nomada_backend_test. No se
+crearon cuentas administrativas reales, no se ejecutaron migraciones en Cloud
+SQL y no se modificaron datos compartidos. El panel no necesita nuevas tablas.
+No se desplegó ni se subieron cambios a GitHub.
+
+
+## Revisión R2 del 29 de octubre de 2026
+
+24 pruebas aprobadas con PostgreSQL local y cuenta limitada, incluidas cotización,
+paginación de 105 alojamientos, perfiles de anfitrión/administrador y cola de correo
+con fallo SMTP simulado, reintento y consumo concurrente de token. Las migraciones
+1-4 se probaron en nomada_r2_clean_test y se repitieron sin duplicar cambios.
+La herramienta apply-runtime-grants.js se probó en esa misma base de pruebas.
+
+Cobertura de módulos cargados, excluyendo tests: 92.84% líneas, 77.50% ramas y
+89.04% funciones. No incluye frontend, SQL ni archivos no cargados. Comando:
+
+```powershell
+node --test --experimental-test-coverage --test-coverage-exclude='tests/**' tests/*.test.js
+```
+
+En Edge se repitieron los flujos administrativos y se verificaron paginación,
+filtro previo al límite, disponibilidad de fechas, importe pagado cero sin pago,
+impresión sin manejadores inline, perfil de anfitrión y acciones móviles de cuentas.
+No hubo errores JavaScript no controlados. Capturas: docs/evidencias-r2/.
+
+El manual R2 conserva el contenido de páginas no modificadas y sus correcciones
+previas. Las páginas cambiadas se renderizaron e inspeccionaron. Las páginas
+173-176 documentan reglas y límites. No se editaron firmas ni se asignó aceptación.
+Cloud SQL, correo real, pgAudit, respaldo/restauración y despliegue no fueron
+modificados ni validados. Consulta CAMBIOS_R2.md para actualización controlada.

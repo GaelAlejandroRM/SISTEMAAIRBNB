@@ -1,19 +1,17 @@
 # nomada Backend compartido y pantallas conectadas
 
-Entrega preparada sobre la rama `modulo-huesped` del repositorio
-https://github.com/GaelAlejandroRM/SISTEMAAIRBNB, commit `f4100e5`.
-
-El backend y las pantallas conectadas están integrados en la carpeta Git
-`SISTEMAAIRBNB`, en la rama local `integracion-backend`. El frontend anterior
-se respaldó fuera del repositorio antes de reorganizarlo.
-No se creó una PR ni se enviaron cambios a GitHub.
+Código integrado de huésped, anfitrión y administrador en Node.js y PostgreSQL.
+La revisión local R2 del 29 de octubre de 2026 está alineada con
+[el manual corregido](docs/Documento_Nomada_V1.6_Corregido_R2.pdf).
+Consulta [CAMBIOS_R2.md](CAMBIOS_R2.md) para actualizar migraciones y permisos.
+Los cambios locales de esta revisión no se han enviado a GitHub ni desplegado.
 
 ## Qué incluye
 
 - Registro público de huéspedes y anfitriones, inicio/cierre de sesión y perfil.
 - Contraseñas con scrypt y salt. Sesiones opacas revocables en PostgreSQL y cookie
   HttpOnly, SameSite=Strict, con duración de 8 horas. Esta implementación usa
-  sesiones opacas, no JWT; si la evaluación exige JWT se debe acordar esa adaptación.
+  sesiones opacas SID, conforme a la descripción actualizada del manual R2.
 - Permisos por rol y propietario, consultas parametrizadas, validación de origen
   en escrituras, límite básico de intentos de acceso por IP.
 - Alojamientos, precio, servicios, fotografías, publicación y calendario.
@@ -25,8 +23,10 @@ No se creó una PR ni se enviaron cambios a GitHub.
 - Pagos exclusivamente simulados, con reintento de rechazado a aprobado.
 - Comprobante de operación, reseña después de estancia finalizada,
   notificaciones y favoritos persistentes por huésped.
-- Endpoints de administración para usuarios, alojamientos, reservas, pagos,
-  reseñas, resumen y bitácora. No incluye la pantalla visual de administrador.
+- Panel de administración en admin.html para usuarios, alojamientos, reservas,
+  pagos, reseñas, resumen y bitácora. Ver ADMINISTRADOR.md para el acceso inicial.
+- Perfil compartido para todos los roles y acciones explícitas de activar/desactivar cuentas.
+- Recuperación por SMTP con enlaces de un solo uso y cola cifrada con reintentos.
 - Bitácora de aplicación y guía separada para pgAudit.
 
 ## Archivos y dónde acomodarlos
@@ -58,8 +58,9 @@ integrante. El ejecutable cloud-sql-proxy.exe permanece fuera del repositorio.
 
 ## Conexión existente de Cloud SQL
 
-La base `nomada` y las migraciones ya fueron configuradas durante la instalación
-guiada. Para continuar en esta computadora, conserva el proxy abierto en
+La base `nomada` ya existe en el entorno compartido. Esta revisión agrega la
+migración 4 para la cola y requiere confirmar también la migración 3 y permisos.
+No se han aplicado allí durante esta revisión. Consulta CAMBIOS_R2.md antes de iniciar. Para continuar en esta computadora, conserva el proxy abierto en
 127.0.0.1:5433 y ejecuta `npm.cmd start` en esta carpeta. El usuario habitual del
 backend debe ser `nomada_app`. No vuelvas a crear la base ni las cuentas si ya
 existen. Las instrucciones de instalación local siguientes son para un ambiente
@@ -165,32 +166,29 @@ Las sesiones se comparten entre pestañas del mismo perfil: para utilizar dos
 cuentas simultáneas emplea perfiles distintos o una ventana privada.
 Las pantallas consultan cambios al navegar; no se implementaron WebSockets.
 
-## Administrador preparado para su futura interfaz
+## Panel de administrador
 
-Desde PowerShell configura variables temporales, sin escribirlas en Git:
+Desde PowerShell, con el proxy activo y .env configurado, crea una cuenta
+administrativa autorizada mediante el asistente:
 
 ```powershell
-$env:ADMIN_NAME = 'Nombre del administrador'
-$env:ADMIN_EMAIL = 'admin@tu-proyecto.test'
-$env:ADMIN_PASSWORD = Read-Host 'Contraseña temporal para la cuenta' -MaskInput
-npm.cmd run admin
-Remove-Item Env:ADMIN_PASSWORD
+.\tools\crear-admin.ps1
 ```
 
-`-MaskInput` requiere PowerShell 7. En otras terminales utiliza el mecanismo de
-captura segura disponible y asigna la variable sin publicar su valor.
+El asistente solicita la contraseña de forma oculta y elimina las variables
+temporales al finalizar. No escribe la contraseña en Git ni en .env.
 El registro público rechaza el rol administrador. El comando crea una cuenta
 nueva; no promueve silenciosamente una existente. Tras iniciar sesión desde
-`acceso.html`, el administrador ve por ahora el JSON de resumen. Sus compañeros
-podrán consumir los endpoints documentados en API.md desde su futura pantalla.
+`acceso.html`, el administrador entra al panel `admin.html`. La guía
+ADMINISTRADOR.md describe la gestión de cuentas, moderación y seguimiento.
 
 ## Reglas configurables
 
 - `SERVICE_FEE_BPS=0`: no se aplica tarifa. `1000` equivaldría a 10 %. Cambiarlo
   solo después de acordar la regla. Cada reserva conserva su importe y tarifa.
-- `CANCEL_BEFORE_ARRIVAL=false`: no permite cancelar confirmadas. Si se acuerda
-  la regla implementada, `true` permite cancelar antes del día de entrada. No
-  calcula reembolsos. Cancelar solicitudes pendientes sí está permitido.
+- Política R2: el huésped solo puede cancelar solicitudes pendientes. No se
+  cancelan confirmadas ni se calculan reembolsos. La variable antigua
+  CANCEL_BEFORE_ARRIVAL ya no habilita excepciones.
 - Las solicitudes pendientes retienen las fechas y no expiran automáticamente.
   Definir su plazo y proceso de expiración es trabajo pendiente.
 - Máximo 365 noches y 100000 MXN por noche, con límite de importe de operación
@@ -217,14 +215,16 @@ Consulta VALIDACION.md para el alcance de la ejecución realizada.
 
 ## Pendientes antes de producción
 
-- Proveedor real de correo y recuperación de cuenta con tokens temporales.
+- Verificar entrega real SMTP y trabajador dedicado para despliegues remotos;
+  la recuperación y su cola ya están implementadas. Ver RECUPERACION.md.
 - Configurar y verificar pgAudit; la extensión no estaba instalada en la
   instancia aislada usada para estas pruebas. Ver PGAUDIT.md.
 - HTTPS, cookies Secure, acceso de red a PostgreSQL, respaldos, restauración y
   rotación/retención de logs conforme a la política aprobada.
 - Pruebas de carga y compatibilidad en otros navegadores/dispositivos.
-- Cerrar reglas de cancelación, retención, expiración, reembolsos y cargos.
-- Pantalla visual de administración y las reglas nuevas que acuerde el equipo.
+- Acordar cualquier ampliación futura de cancelación, retención, expiración,
+  reembolsos y cargos; la política actual se documenta en R2.
+- Reglas administrativas adicionales que acuerde el equipo.
 
 Para despliegue con HTTPS, configura PUBLIC_ORIGIN, COOKIE_SECURE=true y
 NODE_ENV=production. La aplicación rechaza la combinación de producción sin

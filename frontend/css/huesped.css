@@ -1690,6 +1690,14 @@ form select:focus {
   }
 }
 
+@media print {
+  body > :not(#modal-voucher) { display: none !important; }
+  #modal-voucher[open] { position: static; display: block; max-width: none; max-height: none; width: 100%; margin: 0; padding: 0; border: 0; overflow: visible; }
+  #modal-voucher::backdrop { background: white; }
+  #modal-voucher .ticket-acciones, #cerrar-voucher { display: none !important; }
+  #voucher-cuerpo, #modal-voucher .modal-contenido { max-height: none; overflow: visible; }
+}
+
 @media (max-width: 640px) {
   .sidebar {
     position: static;

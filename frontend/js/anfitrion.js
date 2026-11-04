@@ -1,8 +1,6 @@
 'use strict';
 
-// Adaptador de almacenamiento local.
-// Cuando exista el backend, estas operaciones se sustituirán por llamadas a su API.
-const CLAVE = 'nomada_anfitrion_front_v1';
+// Panel conectado a la API: el servidor valida propietario, disponibilidad y estados.
 const $ = selector => document.querySelector(selector);
 const nuevoId = () =>
   globalThis.crypto?.randomUUID?.() ||
@@ -509,7 +507,7 @@ function vistaReservas() {
 
     <p class="texto-secundario">
       Aceptar y rechazar actualiza el estado en PostgreSQL.
-      La cancelación de reservas confirmadas queda pendiente de la política del proyecto.
+      El huésped puede cancelar solicitudes pendientes. Esta versión no permite cancelar reservas confirmadas.
     </p>
 
     <section class="panel">${tablaReservas(reservas)}</section>

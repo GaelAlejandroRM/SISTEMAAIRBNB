@@ -6,6 +6,6 @@ for(const name of ['login','registro'])document.getElementById(name).addEventLis
   const u=await Nomada.api(`/api/${name}`,'POST',Object.fromEntries(new FormData(form)));
   if(name==='registro'){form.reset();msg.textContent='Cuenta creada. Inicia sesión arriba.';return;}
   const desired=new URLSearchParams(location.search).get('destino');
-  location.href=u.rol==='anfitrion'?'anfitrion.html':u.rol==='administrador'?'api/admin/resumen':desired==='viajes.html'?'viajes.html':'huesped.html';
+  location.href=u.rol==='anfitrion'?'anfitrion.html':u.rol==='administrador'?'admin.html':desired==='viajes.html'?'viajes.html':'huesped.html';
  }catch(e){msg.textContent=e.message;}finally{button.disabled=false;}
 });
