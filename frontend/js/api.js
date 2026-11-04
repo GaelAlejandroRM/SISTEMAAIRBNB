@@ -7,7 +7,7 @@ window.Nomada={
  },
  async require(role){
   try{const u=await this.api('/api/yo');if(u.rol!==role)throw new Error(`Esta pantalla requiere una cuenta de ${role}.`);return u;}
-  catch(e){location.href=`acceso.html?destino=${role==='anfitrion'?'anfitrion.html':'huesped.html'}`;throw e;}
+  catch(e){const pages={anfitrion:'anfitrion.html',huesped:'huesped.html',administrador:'admin.html'};location.href=`acceso.html?destino=${pages[role]||'huesped.html'}`;throw e;}
  },
  async logout(){await this.api('/api/logout','POST',{});location.href='acceso.html';}
 };

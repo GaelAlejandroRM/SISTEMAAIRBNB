@@ -1,0 +1,14 @@
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/node_modules
+**/.git

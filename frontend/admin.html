@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Administración de usuarios, alojamientos y operaciones de nomada">
+  <title>nomada | Administración</title>
+  <link rel="stylesheet" href="css/anfitrion.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script src="js/api.js" defer></script>
+  <script src="js/admin.js" defer></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+  <p id="comprobando" class="comprobando" role="status">Comprobando acceso de administrador…</p>
+  <div id="panel-admin" hidden>
+    <aside class="sidebar">
+      <a class="marca" href="admin.html">nomada<span>ADMINISTRACIÓN</span></a>
+      <nav aria-label="Administración">
+        <button type="button" data-vista="resumen">◫ Resumen</button>
+        <button type="button" data-vista="usuarios">◉ Usuarios</button>
+        <button type="button" data-vista="alojamientos">⌂ Alojamientos</button>
+        <button type="button" data-vista="reservas">▤ Reservaciones</button>
+        <button type="button" data-vista="pagos">$ Pagos simulados</button>
+        <button type="button" data-vista="resenas">☆ Reseñas</button>
+        <button type="button" data-vista="auditoria">☷ Bitácora</button>
+      </nav>
+      <div class="sidebar-pie"><div class="avatar" aria-hidden="true">A</div><div><strong id="admin-nombre"></strong><small>Administrador</small></div></div>
+    </aside>
+    <main id="contenido" tabindex="-1">
+      <header class="barra-superior"><span>Supervisión de la plataforma</span><div class="acciones"><a href="perfil.html">Mi perfil</a><button id="actualizar" type="button">Actualizar</button><button id="salir-admin" type="button">Cerrar sesión</button></div></header>
+      <div id="error-admin" class="error-admin" role="alert" hidden></div>
+      <div id="vista" aria-live="polite"></div>
+    </main>
+  </div>
+  <div id="mensaje" role="status" aria-live="polite" hidden></div>
+  <dialog id="editar-usuario" aria-labelledby="titulo-usuario">
+    <form id="form-usuario">
+      <div class="encabezado-modal"><h2 id="titulo-usuario">Administrar cuenta</h2><button type="button" data-cerrar="editar-usuario" aria-label="Cerrar">✕</button></div>
+      <p id="usuario-identidad"></p>
+      <input type="hidden" name="id">
+      <label>Rol<select name="rol" required><option value="huesped">Huésped</option><option value="anfitrion">Anfitrión</option><option value="administrador">Administrador</option></select></label>
+      <label class="check-publicar"><input name="activo" type="checkbox"> Cuenta activa</label>
+      <p class="texto-secundario">Guardar revoca las sesiones de esta cuenta. Los cambios de rol conservan su historial y están sujetos a las restricciones del servidor.</p>
+      <div class="acciones-modal"><button type="button" data-cerrar="editar-usuario">Cancelar</button><button class="primario" type="submit">Guardar cambios</button></div>
+    </form>
+  </dialog>
+  <dialog id="confirmar-admin" aria-labelledby="titulo-confirmacion">
+    <form id="form-confirmar"><h2 id="titulo-confirmacion">Confirmar cambio</h2><p id="detalle-confirmacion"></p><div class="acciones-modal"><button type="button" data-cerrar="confirmar-admin">Cancelar</button><button class="primario" type="submit">Confirmar</button></div></form>
+  </dialog>
+  <dialog id="detalle-admin" aria-labelledby="titulo-detalle">
+    <div class="encabezado-modal"><h2 id="titulo-detalle">Detalle del registro</h2><button type="button" data-cerrar="detalle-admin" aria-label="Cerrar detalle">✕</button></div><div id="contenido-detalle"></div>
+  </dialog>
+</body>
+</html>

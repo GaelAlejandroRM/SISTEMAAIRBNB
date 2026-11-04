@@ -120,15 +120,76 @@ test('administración preparada, moderación, bitácora y revocación de sesione
  admin=(await call('/api/login','POST',{email:adminEmail,password:'AdministradorSeguro2026'})).cookie;
  for(const route of ['usuarios','alojamientos','reservas','pagos','resenas','auditoria','resumen'])assert.equal((await call('/api/admin/'+route,'GET',undefined,admin)).status,200);
  const users=(await call('/api/admin/usuarios','GET',undefined,admin)).body;assert.equal(users.some(u=>'password_hash'in u),false);
+ const filtered=await call(`/api/admin/usuarios?q=${encodeURIComponent(guest.email)}&rol=huesped&estado=true&limit=1`,'GET',undefined,admin);assert.equal(filtered.status,200);assert.equal(filtered.body.length,1);assert.equal(filtered.body[0].id,guest.user.id);
+ assert.equal((await call(`/api/admin/usuarios?q=${encodeURIComponent(guest.email)}&rol=anfitrion`,'GET',undefined,admin)).body.length,0);
+ const byListing=await call(`/api/admin/reservas?q=${listingId}&estado=confirmada`,'GET',undefined,admin);assert.equal(byListing.status,200);
+ const summary=await call('/api/admin/resumen','GET',undefined,admin);assert('solicitudes_pendientes' in summary.body);assert('resenas_ocultas' in summary.body);
  assert.equal((await call(`/api/admin/usuarios/${adminId}`,'PATCH',{activo:false},admin)).status,409);
  assert.equal((await call(`/api/admin/alojamientos/${listingId}`,'PATCH',{moderado:true},admin)).status,200);
  assert.equal((await call(`/api/alojamientos/${listingId}`)).status,404);
  await call(`/api/admin/alojamientos/${listingId}`,'PATCH',{moderado:false},admin);
+ const review=(await call('/api/admin/resenas?q=Excelente%20prueba','GET',undefined,admin)).body.find(r=>r.titulo==='Casa de prueba');assert(review);
+ assert.equal((await call(`/api/admin/resenas/${review.id}`,'PATCH',{visible:false},admin)).status,200);
+ const hidden=(await call(`/api/admin/resenas?q=${review.id}&estado=false`,'GET',undefined,admin)).body;assert.equal(hidden[0].visible,false);
+ assert.equal((await call(`/api/admin/resenas/${review.id}`,'PATCH',{visible:true},admin)).status,200);
  assert.equal((await call(`/api/admin/usuarios/${other.user.id}`,'PATCH',{activo:false},admin)).status,200);
  assert.equal((await call('/api/yo','GET',undefined,other.cookie)).status,401);
 });
+test('cotización consulta disponibilidad y el comprobante distingue pago pendiente de aprobado',async()=>{
+ const occupied=await call(`/api/alojamientos/${listingId}/disponibilidad?entrada=${addDays(5)}&salida=${addDays(8)}&personas=2`);
+ assert.equal(occupied.status,200);assert.equal(occupied.body.disponible,false);assert.equal(occupied.body.totalCentavos,450075);
+ const free=await call(`/api/alojamientos/${listingId}/disponibilidad?entrada=${addDays(70)}&salida=${addDays(72)}&personas=2`);assert.equal(free.body.disponible,true);
+ const r=await call('/api/reservas','POST',{alojamientoId:listingId,entrada:addDays(70),salida:addDays(72),personas:2,claveOperacion:crypto.randomUUID()},guest.cookie);
+ let receipt=await call(`/api/reservas/${r.body.id}/comprobante`,'GET',undefined,guest.cookie);assert.equal(typeof receipt.body.huesped,'string');assert(receipt.body.huesped.length>0);assert.equal(receipt.body.pago,'pendiente');assert.equal(receipt.body.importePagadoCentavos,0);
+ await call(`/api/reservas/${r.body.id}/estado`,'PATCH',{estado:'confirmada'},host.cookie);
+ assert.equal((await call(`/api/reservas/${r.body.id}/estado`,'PATCH',{estado:'cancelada'},guest.cookie)).status,409);
+ await call(`/api/reservas/${r.body.id}/pago`,'POST',{resultado:'rechazado'},guest.cookie);
+ receipt=await call(`/api/reservas/${r.body.id}/comprobante`,'GET',undefined,guest.cookie);assert.equal(receipt.body.pago,'rechazado');assert.equal(receipt.body.importePagadoCentavos,0);
+ await call(`/api/reservas/${r.body.id}/pago`,'POST',{resultado:'aprobado'},guest.cookie);
+ receipt=await call(`/api/reservas/${r.body.id}/comprobante`,'GET',undefined,guest.cookie);assert.equal(receipt.body.importePagadoCentavos,300050);
+});
+
+test('catálogo pagina más de cien registros y filtra servicios antes del límite',async()=>{
+ const location='Catalogo-'+stamp;
+ for(let i=0;i<105;i++)await pool.query("INSERT INTO listings(id,owner_id,title,description,location,price_cents,capacity,published,services) VALUES($1,$2,$3,'Prueba',$4,10000,2,true,$5)",[crypto.randomUUID(),host.user.id,'Catalogo '+i,location,JSON.stringify(i===0?['Servicio exclusivo']:['Wi-Fi'])]);
+ const p1=await call('/api/alojamientos?'+new URLSearchParams({q:location,limit:20,offset:0}));
+ const p2=await call('/api/alojamientos?'+new URLSearchParams({q:location,limit:20,offset:100}));
+ assert.equal(p1.body.length,20);assert.equal(p2.body.length,5);assert(!p1.body.some(a=>p2.body.some(b=>a.id===b.id)));
+ const service=await call('/api/alojamientos?'+new URLSearchParams({q:location,limit:20,servicio:'Servicio exclusivo'}));assert.equal(service.body.length,1);
+});
+
+test('perfil de anfitrión y administrador registra bitácora y preserva rol y correo',async()=>{
+ for(const cookie of [host.cookie,admin]){
+  const previous=(await call('/api/yo','GET',undefined,cookie)).body;
+  const updated=await call('/api/perfil','PUT',{nombre:'Perfil QA',telefono:'5512345678',ciudad:'Toluca',rol:'huesped',email:'otra@example.test'},cookie);
+  assert.equal(updated.status,200);assert.equal(updated.body.rol,previous.rol);assert.equal(updated.body.email,previous.email);
+  const entry=await pool.query("SELECT id FROM audit WHERE actor_id=$1 AND action='perfil.actualizado'",[previous.id]);assert(entry.rowCount);
+ }
+});
+
+test('recuperación persistente reintenta SMTP, respeta enfriamiento y consume un solo enlace concurrente',async()=>{
+ const R=require('../backend/recovery'),mailer=require('nodemailer'),{transaction}=require('../backend/db');
+ const original=mailer.createTransport;process.env.SMTP_USER='qa@example.test';process.env.SMTP_PASSWORD='test-secret-only';
+ let emailMessage,failDelivery=true;
+ mailer.createTransport=()=>({sendMail:async value=>{if(failDelivery)throw new Error('SMTP simulado');emailMessage=value;}});
+ try{
+  const response=await call('/api/recuperacion','POST',{email:guest.email});assert.equal(response.status,200);
+  const job=(await pool.query('SELECT * FROM recovery_mail_jobs WHERE user_id=$1 ORDER BY created_at DESC',[guest.user.id])).rows[0];assert(job);assert(!job.payload.includes(guest.email));
+  const same=await call('/api/recuperacion','POST',{email:guest.email});assert.deepEqual(same.body,response.body);
+  assert.equal((await pool.query('SELECT id FROM recovery_mail_jobs WHERE user_id=$1',[guest.user.id])).rowCount,1);
+  const absent=await call('/api/recuperacion','POST',{email:`ausente-${stamp}@example.test`});assert.deepEqual(absent.body,response.body);
+  await R.deliver(pool);let failed=(await pool.query('SELECT * FROM recovery_mail_jobs WHERE id=$1',[job.id])).rows[0];assert.equal(failed.completed_at,null);assert.equal(failed.attempts,1);
+  await pool.query('UPDATE recovery_mail_jobs SET next_attempt_at=now() WHERE id=$1',[job.id]);failDelivery=false;await R.deliver(pool);assert(emailMessage);
+  const token=emailMessage.text.match(/#([a-f0-9]{64})/)[1];
+  const results=await Promise.allSettled([1,2].map(()=>R.reset(transaction,token,'NuevaPruebaSegura2026','NuevaPruebaSegura2026')));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal((await call('/api/yo','GET',undefined,guest.cookie)).status,401);
+  const done=(await pool.query('SELECT * FROM recovery_mail_jobs WHERE id=$1',[job.id])).rows[0];assert.equal(done.result,'enviado');assert.equal(done.payload,'');
+ }finally{mailer.createTransport=original;delete process.env.SMTP_USER;delete process.env.SMTP_PASSWORD;}
+});
+
 test('origen externo rechazado y logout invalida sesión',async()=>{
  const external=await fetch(base+'/api/logout',{method:'POST',headers:{Origin:'https://otro.example',Cookie:host.cookie,'Content-Type':'application/json'},body:'{}'});assert.equal(external.status,403);
  assert.equal((await call('/api/logout','POST',{},host.cookie)).status,200);
  assert.equal((await call('/api/yo','GET',undefined,host.cookie)).status,401);
+ const event=await pool.query("SELECT id FROM audit WHERE actor_id=$1 AND action='sesion.cierre'",[host.user.id]);assert(event.rowCount);
 });

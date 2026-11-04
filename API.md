@@ -13,6 +13,8 @@ sesión, 403 sin permiso, 404 recurso no visible, 409 conflicto.
 | POST | /api/registro | nombre, email, password de 12 a 128 caracteres, rol huesped o anfitrion |
 | POST | /api/login | email, password |
 | POST | /api/logout | {} |
+| POST | /api/recuperacion | email. Respuesta genérica; encola entrega si procede |
+| POST | /api/recuperacion/restablecer | token, password, confirmacion |
 | GET | /api/yo | Cuenta autenticada |
 | PUT | /api/perfil | nombre, telefono, ciudad. No cambia rol ni correo |
 | GET | /api/config | serviceFeeBps, cancelBeforeArrival |
@@ -22,8 +24,9 @@ sesión, 403 sin permiso, 404 recurso no visible, 409 conflicto.
 
 | Método | Ruta | Uso |
 |---|---|---|
-| GET | /api/alojamientos | Catálogo público. Filtros q, categoria, personas, entrada, salida, precioMax y offset. Hasta 100 por consulta |
+| GET | /api/alojamientos | Catálogo público. Filtros q, categoria, personas, entrada, salida, precioMax, servicio, limit y offset. Hasta 100 por consulta; filtros antes del límite |
 | GET | /api/alojamientos/:id | Detalle publicado y reseñas visibles |
+| GET | /api/alojamientos/:id/disponibilidad | entrada, salida, personas. Retorna disponible, noches, precioNocheCentavos, subtotalCentavos, tarifaCentavos y totalCentavos. No bloquea fechas |
 | POST | /api/alojamientos | Crear, solo anfitrión |
 | PUT | /api/alojamientos/:id | Reemplazar información, solo propietario |
 | GET | /api/anfitrion/panel | Alojamientos, reservas, bloqueos, reseñas y notificaciones propios |
@@ -89,7 +92,7 @@ Transiciones:
 - Anfitrión: pendiente a confirmada/rechazada antes de la entrada o el mismo día.
 - Huésped: pendiente a cancelada.
 - Anfitrión: confirmada a finalizada después de la salida.
-- Confirmada a cancelada solo si la configuración permite cancelación previa.
+- Confirmada a cancelada no está permitida en la política R2.
 - Pago: rechazado puede reintentarse como aprobado. Un aprobado no se degrada
   por un reintento; se devuelve el mismo pago. No se cobran tarjetas reales.
 
@@ -100,6 +103,13 @@ determinar el día actual. Las notificaciones conservan fecha/hora timestamptz.
 
 Todas las rutas requieren una cuenta administrador activa. Las consultas aceptan
 `limit` de 1 a 500 y `offset`.
+
+También aceptan `q` para búsqueda en servidor y `estado` para filtrar. En usuarios,
+estado es `true` (activo) o `false` y `rol` filtra el tipo de cuenta. En alojamientos,
+estado filtra moderación (`true` oculto, `false` sin moderación); en reseñas filtra
+visibilidad (`true` visible, `false` oculta). Reservas y pagos aceptan sus estados
+nominales; auditoría acepta el nombre exacto de la acción. El frontend muestra
+50 registros por página y solicita una fila adicional para detectar la siguiente.
 
 | Método | Ruta | Uso |
 |---|---|---|
@@ -121,3 +131,21 @@ ni modifica directamente el importe de una reserva o un pago.
 
 La bitácora de aplicación no contiene los logs SQL de pgAudit. Esos se consultan
 con las herramientas de administración de PostgreSQL y permisos separados.
+
+
+## Comprobante y perfiles en R2
+
+El comprobante devuelve `pago` (pendiente/rechazado/aprobado), `pagoId`,
+`importePagadoCentavos` (cero sin aprobación), `precioNocheCentavos`,
+`tarifaCentavos` y `totalCentavos`. Todos los importes están en centavos MXN.
+No es una factura ni implica transacción bancaria real.
+`perfil.html` permite editar datos propios con cualquier rol autenticado.
+Las modificaciones del perfil y el cierre de sesión se registran en audit.
+
+## Cola de recuperación
+
+Las migraciones 3 y 4 crean password_resets y recovery_mail_jobs. El trabajo
+se almacena cifrado y no se devuelve por API. SMTP se procesa en segundo plano
+en local o con `npm.cmd run mail:work` en un trabajador dedicado. Consultar
+RECUPERACION.md antes de desplegar en Cloud Run. No existen endpoints públicos
+para leer la cola, obtener tokens o recuperar contraseñas almacenadas.

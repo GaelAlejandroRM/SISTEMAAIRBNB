@@ -1,8 +1,8 @@
 'use strict';
 const { Pool, types } = require('pg');
+const { databaseConfig } = require('./config');
 types.setTypeParser(1082, value => value); // Días civiles sin conversión de zona horaria.
-if (!process.env.DATABASE_URL) throw new Error('Configura DATABASE_URL en .env.');
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+const pool = new Pool(databaseConfig());
 pool.on('error', e => console.error('Error de conexión PostgreSQL:', e.code));
 async function transaction(fn) {
   const client = await pool.connect();

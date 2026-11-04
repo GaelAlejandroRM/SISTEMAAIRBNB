@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nomada | Recuperar cuenta</title><meta name="referrer" content="no-referrer"><link rel="stylesheet" href="css/anfitrion.css"><script src="js/api.js" defer></script><script src="js/recuperar.js" defer></script></head>
+<body><main style="margin:40px auto;max-width:520px;padding:20px"><a class="marca" href="huesped.html">nomada</a>
+<h1>Recupera tu cuenta</h1><p id="resultado" role="status" aria-live="polite"></p>
+<section class="panel" id="solicitud"><p>Escribe el correo con el que registraste tu cuenta. Te enviaremos un enlace para crear una nueva contraseña.</p>
+<form id="pedir"><label>Correo electrónico<input type="email" name="email" autocomplete="email" maxlength="254" required></label><button class="primario">Enviar enlace</button></form></section>
+<section class="panel" id="cambio" hidden><p>Elige una contraseña de 12 a 128 caracteres.</p><form id="restablecer">
+<label>Nueva contraseña<input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+<label>Confirma tu contraseña<input type="password" name="confirmacion" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+<button class="primario">Guardar contraseña</button></form></section><p><a href="acceso.html">Volver a iniciar sesión</a></p></main></body></html>
