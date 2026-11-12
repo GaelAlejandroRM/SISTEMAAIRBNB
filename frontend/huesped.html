@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="css/huesped.css">
   <script src="js/api.js" defer></script>
   <script src="js/huesped.js" defer></script>
+  <link rel="stylesheet" href="css/cuenta.css">
+  <script defer src="js/mapa.js"></script>
 </head>
 
 <body>
@@ -82,28 +84,27 @@
       </div>
     </header>
 
-    <div class="aviso-demo">
-      <div class="aviso-demo-texto">
-        <span class="icono-aviso" aria-hidden="true">⚡</span>
-        <span>
-          <strong>Huésped conectado a PostgreSQL.</strong>
-          Las reservaciones y los cambios se guardan en el backend compartido.
-        </span>
-      </div>
-
-      <div class="aviso-demo-acciones">
-        <button id="cargar-demo" type="button">
-          Cerrar sesión
-        </button>
-      </div>
-    </div>
-
     <!-- Contenedor dinámico de pantallas -->
     <div id="vista"></div>
   </main>
 
   <!-- Notificación toast flotante -->
   <div id="mensaje" role="status" aria-live="polite" hidden></div>
+
+  <dialog id="modal-pago" class="cuenta-dialog" aria-labelledby="titulo-pago">
+    <h2 id="titulo-pago">Pago simulado</h2>
+    <p>Importe de la reserva <strong id="importe-pago"></strong></p>
+    <p>Usa los datos de prueba indicados. No introduzcas datos bancarios reales.</p>
+    <form id="form-pago" autocomplete="off">
+      <label>Titular de prueba<input required pattern="PERSONA DE PRUEBA" placeholder="PERSONA DE PRUEBA"></label>
+      <label>Tarjeta de prueba<input required inputmode="numeric" pattern="0{16}" maxlength="16" placeholder="0000000000000000"></label>
+      <label>Vencimiento de prueba<input required pattern="12/99" maxlength="5" placeholder="12/99"></label>
+      <label>Código de prueba<input required inputmode="numeric" pattern="000" maxlength="3" placeholder="000"></label>
+      <label>Resultado de la simulación<select name="resultado"><option value="aprobado">Aprobado</option><option value="rechazado">Rechazado</option></select></label>
+      <p id="error-pago" role="status"></p>
+      <div class="cuenta-acciones"><button id="enviar-pago" type="submit" class="primario">Confirmar simulación</button><button id="cancelar-pago" type="button">Cancelar</button></div>
+    </form>
+  </dialog>
 
   <!-- MODAL: Detalle de Alojamiento y Formulario de Reserva -->
   <dialog id="modal-detalle">

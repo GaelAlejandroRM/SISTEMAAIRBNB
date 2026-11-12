@@ -9,3 +9,11 @@ for(const name of ['login','registro'])document.getElementById(name).addEventLis
   location.href=u.rol==='anfitrion'?'anfitrion.html':u.rol==='administrador'?'admin.html':desired==='viajes.html'?'viajes.html':'huesped.html';
  }catch(e){msg.textContent=e.message;}finally{button.disabled=false;}
 });
+
+const visibilityButton=document.getElementById('ver-password');
+const loginPassword=document.getElementById('password-login');
+visibilityButton.addEventListener('click',()=>{
+ const show=loginPassword.type==='password';
+ loginPassword.type=show?'text':'password';
+ visibilityButton.textContent=show?'Ocultar contraseña':'Mostrar contraseña';
+});

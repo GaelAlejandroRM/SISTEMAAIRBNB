@@ -158,6 +158,7 @@ let catalogo=[],cargaSecuencia=0;
 async function cargarDatos() {
   const sequence=++cargaSecuencia;
   const p=new URLSearchParams({personas:ui.filtroHuespedes,q:ui.filtroDestino,limit:TAMANO_PAGINA+1,offset:ui.pagina*TAMANO_PAGINA});
+  if(ui.puntoMapa){p.set('latitud',ui.puntoMapa.latitud);p.set('longitud',ui.puntoMapa.longitud);}
   if(ui.filtroServicio!=='todos')p.set('servicio',ui.filtroServicio);
   if(ui.filtroLlegada||ui.filtroSalida){p.set('entrada',ui.filtroLlegada);p.set('salida',ui.filtroSalida);}
   const [panel,resultados]=await Promise.all([Nomada.api('/api/huesped/panel'),Nomada.api('/api/alojamientos?'+p)]);
@@ -171,7 +172,14 @@ function actualizarInfoSidebar() {
   const nombreSidebar = $('#nombre-sidebar');
   const avatarSidebar = $('#avatar-sidebar');
   if (nombreSidebar) nombreSidebar.textContent = perfil.nombre;
-  if (avatarSidebar) avatarSidebar.textContent = (perfil.nombre || 'H').charAt(0).toUpperCase();
+  if (avatarSidebar) {
+    avatarSidebar.textContent=(perfil.nombre || 'H').charAt(0).toUpperCase();
+    if(perfil.avatar){
+      const image=document.createElement('img');
+      image.src=perfil.avatar;image.alt='';image.className='foto-cuenta';
+      avatarSidebar.replaceChildren(image);
+    }
+  }
 }
 
 function actualizarBadgesNav() {
@@ -272,6 +280,8 @@ function vistaExplorar() {
         </div>
 
         <div class="busqueda-acciones">
+          <button type="button" id="buscar-mapa" class="secundario-btn">Elegir en el mapa</button>
+          ${ui.puntoMapa?'<button type="button" id="quitar-mapa" class="secundario-btn">Quitar zona de 25 km</button>':''}
           <button type="submit" class="primario">
             <span>⌕ Buscar</span>
           </button>
@@ -492,7 +502,7 @@ function vistaViajes() {
                 </div>
 
                 <div class="viaje-botones">
-                  ${r.estado==='confirmada' && r.pago!=='aprobado' ? `<button type="button" class="primario" data-pagar="${r.id}" data-resultado="aprobado">Simular pago aprobado</button><button type="button" data-pagar="${r.id}" data-resultado="rechazado">Simular pago rechazado</button>` : ''}
+                  ${r.estado==='confirmada' && r.pago!=='aprobado' ? `<button type="button" class="primario" data-pagar="${r.id}">Simular pago</button>` : ''}
                   <button
                     type="button"
                     class="secundario-btn"
@@ -749,7 +759,7 @@ function vistaPerfil() {
       <!-- Columna Lateral: Tarjeta Resumen -->
       <div class="perfil-tarjeta-lateral">
         <div class="perfil-avatar-grande" id="perfil-avatar-letra">
-          ${(perfil.nombre || 'H').charAt(0).toUpperCase()}
+          ${perfil.avatar?`<img class="foto-cuenta" src="${escapar(perfil.avatar)}" alt="Foto de perfil">`:escapar((perfil.nombre || 'H').charAt(0).toUpperCase())}
         </div>
 
         <h3 id="perfil-nombre-tarjeta">${escapar(perfil.nombre)}</h3>
@@ -790,6 +800,12 @@ function vistaPerfil() {
           Estos datos se utilizarán automáticamente cuando reserves un alojamiento y para tus comprobantes.
         </p>
 
+        <div class="cuenta-acciones"><a href="privacidad.html">Aviso de privacidad y reglas</a><button id="salir-perfil" type="button">Cerrar sesión</button></div>
+        <div class="foto-cuenta-editor">
+          <label for="foto-perfil">Cambiar foto de perfil</label>
+          <input id="foto-perfil" type="file" accept="image/png,image/jpeg">
+          ${perfil.avatar?'<button type="button" id="quitar-foto-perfil">Quitar foto</button>':''}
+        </div>
         <form id="form-perfil-huesped">
           <label>
             Nombre completo *
@@ -1293,6 +1309,31 @@ function actualizarSelectorEstrellas(valor) {
    LISTENERS Y EVENTOS GLOBALES
    ========================================================================== */
 
+async function guardarFoto(photo){
+  perfil=await Nomada.api('/api/perfil/foto','PUT',{foto:photo});
+  actualizarInfoSidebar();
+  const avatar=$('#perfil-avatar-letra');
+  if(avatar)avatar.replaceChildren(...$('#avatar-sidebar').cloneNode(true).childNodes);
+  const remove=$('#quitar-foto-perfil');
+  if(photo&&!remove){
+    const button=document.createElement('button');
+    button.id='quitar-foto-perfil';button.type='button';button.textContent='Quitar foto';
+    $('.foto-cuenta-editor').append(button);
+  }else if(!photo)remove?.remove();
+  mensaje('Foto de perfil actualizada.');
+}
+
+function abrirPago(id){
+  const reservation=datos.reservas.find(r=>r.id===id);
+  if(!reservation)return;
+  const form=$('#form-pago');
+  form.reset();
+  form.dataset.reserva=id;
+  $('#importe-pago').textContent=moneda(reservation.totalCentavos);
+  $('#error-pago').textContent='';
+  $('#modal-pago').showModal();
+}
+
 function setupEventListeners() {
   $$('[data-vista]').forEach(button=>button.addEventListener('click',async()=>{
     ui.vista=button.dataset.vista;
@@ -1308,14 +1349,24 @@ function setupEventListeners() {
       if(button.dataset.verDetalle)return await abrirDetalleAlojamiento(button.dataset.verDetalle);
       if(button.dataset.verVoucher)return await abrirVoucher(button.dataset.verVoucher);
       if(button.dataset.cancelarReserva){if(!confirm('¿Cancelar esta solicitud pendiente?'))return;await Nomada.api(`/api/reservas/${button.dataset.cancelarReserva}/estado`,'PATCH',{estado:'cancelada'});return await cargarDatos();}
-      if(button.dataset.pagar){await Nomada.api(`/api/reservas/${button.dataset.pagar}/pago`,'POST',{resultado:button.dataset.resultado});await cargarDatos();return mensaje('Pago simulado guardado. No se efectuó un cobro real.');}
+      if(button.dataset.pagar)return abrirPago(button.dataset.pagar);
+      if(button.id==='salir-perfil')return await Nomada.logout();
+      if(button.id==='quitar-foto-perfil')return await guardarFoto(null);
+      if(button.id==='buscar-mapa'){
+        const form=button.form;
+        return MapaNomada.open(ui.puntoMapa,point=>{
+          ui.puntoMapa=point;
+          form.requestSubmit();
+        });
+      }
+      if(button.id==='quitar-mapa'){ui.puntoMapa=null;button.form.requestSubmit();return;}
       if(button.dataset.abrirResena)return abrirModalResena(button.dataset.abrirResena);
       if(button.dataset.pestana){ui.pestanaViajes=button.dataset.pestana;return render();}
       if(button.dataset.servicio){ui.filtroServicio=button.dataset.servicio;ui.pagina=0;return await cargarDatos();}
       if(button.dataset.catalogoPagina){ui.pagina=Math.max(0,ui.pagina+(button.dataset.catalogoPagina==='siguiente'?1:-1));return await cargarDatos();}
-      if(['limpiar-busqueda','btn-reset-filtros'].includes(button.id)){ui.pagina=0;ui.filtroDestino='';ui.filtroLlegada='';ui.filtroSalida='';ui.filtroHuespedes=1;ui.filtroServicio='todos';return await cargarDatos();}
+      if(['limpiar-busqueda','btn-reset-filtros'].includes(button.id)){ui.puntoMapa=null;ui.pagina=0;ui.filtroDestino='';ui.filtroLlegada='';ui.filtroSalida='';ui.filtroHuespedes=1;ui.filtroServicio='todos';return await cargarDatos();}
       if(button.id==='vaciar-favoritos'){if(!confirm('¿Vaciar tus favoritos?'))return;for(const id of favoritos)await Nomada.api(`/api/favoritos/${id}`,'DELETE');return await cargarDatos();}
-      if(button.id==='marcar-todas-leidas'){await Nomada.api('/api/notificaciones','PATCH',{});return await cargarDatos();}
+      if(button.id==='marcar-todas-leidas'){await Nomada.api('/api/notificaciones','PATCH',{ids:notificacionesHuesped.filter(n=>!n.leida).map(n=>n.id)});return await cargarDatos();}
     }catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
   });
   $('#vista').addEventListener('submit',async event=>{
@@ -1338,10 +1389,44 @@ function setupEventListeners() {
     try{await Nomada.api('/api/resenas','POST',{reservaId:form.elements.reservaId.value,puntuacion:Number(form.elements.puntuacion.value),comentario:form.elements.comentario.value});$('#modal-resena').close();await cargarDatos();mensaje('Reseña guardada.');}
     catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
   });
-  $('#cargar-demo').onclick=()=>Nomada.logout().catch(e=>mensaje(e.message,true));
+  $('#vista').addEventListener('change',async event=>{
+    const input=event.target;
+    if(input.id!=='foto-perfil'||!input.files.length)return;
+    input.disabled=true;
+    try{await guardarFoto(await Nomada.prepareImage(input.files[0],320));}
+    catch(error){mensaje(error.message,true);}
+    finally{input.disabled=false;input.value='';}
+  });
+  $('#cancelar-pago').onclick=()=>$('#modal-pago').close();
+  $('#modal-pago').addEventListener('cancel',event=>{if($('#enviar-pago').disabled)event.preventDefault();});
+  $('#form-pago').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const form=event.currentTarget, button=$('#enviar-pago'), cancel=$('#cancelar-pago');
+    button.disabled=cancel.disabled=true;
+    $('#error-pago').textContent='';
+    try{
+      await Nomada.api(`/api/reservas/${form.dataset.reserva}/pago`,'POST',{resultado:form.elements.resultado.value});
+      $('#modal-pago').close();
+      await cargarDatos();
+      mensaje('Pago simulado registrado.');
+    }catch(error){
+      if($('#modal-pago').open)$('#error-pago').textContent=error.message;
+      else mensaje(error.message,true);
+    }finally{button.disabled=cancel.disabled=false;}
+  });
 }
 document.querySelector('main').hidden=true;
 document.querySelector('aside').hidden=true;
 Nomada.require('huesped').then(async()=>{
-  setupEventListeners();await cargarDatos();document.querySelector('main').hidden=false;document.querySelector('aside').hidden=false;
+  if(new URLSearchParams(location.search).has('perfil'))ui.vista='perfil';
+  setupEventListeners();await cargarDatos();
+  Nomada.watchNotifications(notificacionesHuesped,(items,added)=>{
+    const changed=JSON.stringify(items)!==JSON.stringify(notificacionesHuesped);
+    notificacionesHuesped=items;
+    actualizarBadgesNav();
+    if(changed&&ui.vista==='notificaciones')render();
+    if(added.length)mensaje(added.length===1?added[0].texto:`Tienes ${added.length} notificaciones nuevas.`);
+  });
+  document.querySelector('main').hidden=false;
+  document.querySelector('aside').hidden=false;
 }).catch(e=>mensaje(e.message,true));

@@ -83,6 +83,7 @@ async function reset(transaction,token,password,confirmation){
   await c.query('DELETE FROM sessions WHERE user_id=$1',[id]);
   await c.query('DELETE FROM password_resets WHERE user_id=$1',[id]);
   await c.query("INSERT INTO audit(actor_id,action,target_id) VALUES($1,'cuenta.recuperada',$1)",[id]);
+  await c.query("INSERT INTO notifications(id,user_id,message) VALUES($1,$2,$3)",[crypto.randomUUID(),id,'Restableciste tu contraseña.']);
  });
  return {mensaje:'Contraseña actualizada. Inicia sesión con tu nueva contraseña.'};
 }
