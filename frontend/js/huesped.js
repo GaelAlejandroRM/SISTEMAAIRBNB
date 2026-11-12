@@ -1399,13 +1399,17 @@ function setupEventListeners() {
   });
   $('#cancelar-pago').onclick=()=>$('#modal-pago').close();
   $('#modal-pago').addEventListener('cancel',event=>{if($('#enviar-pago').disabled)event.preventDefault();});
+  $('#modal-pago').addEventListener('close',()=>$('#form-pago').reset());
   $('#form-pago').addEventListener('submit',async event=>{
     event.preventDefault();
     const form=event.currentTarget, button=$('#enviar-pago'), cancel=$('#cancelar-pago');
+    const resultado=form.elements.resultado.value;
+    // Los campos de tarjeta se usan solo para mostrar el flujo en pantalla.
+    for(const input of form.querySelectorAll('input'))input.value='';
     button.disabled=cancel.disabled=true;
     $('#error-pago').textContent='';
     try{
-      await Nomada.api(`/api/reservas/${form.dataset.reserva}/pago`,'POST',{resultado:form.elements.resultado.value});
+      await Nomada.api(`/api/reservas/${form.dataset.reserva}/pago`,'POST',{resultado});
       $('#modal-pago').close();
       await cargarDatos();
       mensaje('Pago simulado registrado.');
