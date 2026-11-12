@@ -27,8 +27,13 @@ const {pool,transaction} = require('./db');
     await c.query(fs.readFileSync(path.join(__dirname,'schema-4.sql'),'utf8'));
     await c.query('INSERT INTO migrations(version) VALUES(4)');
    }
+   const fifth=await c.query('SELECT version FROM migrations WHERE version=5');
+   if(!fifth.rowCount){
+    await c.query(fs.readFileSync(path.join(__dirname,'schema-5.sql'),'utf8'));
+    await c.query('INSERT INTO migrations(version) VALUES(5)');
+   }
   });
-  console.log('Migraciones 1, 2, 3 y 4 aplicadas o previamente registradas.');
+  console.log('Migraciones 1 a 5 aplicadas o previamente registradas.');
  } catch(e) { console.error(e.message); process.exitCode=1; }
  finally { await pool.end(); }
 })();

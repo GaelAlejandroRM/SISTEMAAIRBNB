@@ -23,7 +23,8 @@ async function account(role,label){
  const login=await call('/api/login','POST',{email,password:pw});assert.equal(login.status,200);assert.match(login.cookie,/nomada=/);
  return {cookie:login.cookie,user:login.body,email};
 }
-const listing=()=>({titulo:'Casa de prueba',descripcion:'Descripción de prueba',ubicacion:'Toluca',precio:'1500.25',capacidad:4,servicios:['Wi-Fi'],caracteristicas:'Jardín',fotos:[],publicado:true});
+const photos=["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQB7CYF4AAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYPgPAAEDAQAIicLsAAAAAElFTkSuQmCC"];
+const listing=()=>({titulo:'Casa de prueba',descripcion:'Descripción de prueba',ubicacion:'Toluca',precio:'1500.25',capacidad:4,servicios:['Wi-Fi'],caracteristicas:'Jardín',fotos:photos,publicado:true,latitud:19.289,longitud:-99.656});
 const addDays=n=>new Date(Date.parse(V.today())+n*86400000).toISOString().slice(0,10);
 before(async()=>{await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;});
 after(async()=>{await new Promise(resolve=>server.close(resolve));await pool.end();});
@@ -44,11 +45,20 @@ test('registro público no permite administradores, autenticación y roles',asyn
  const bad=await call('/api/login','POST',{email:host.email,password:'incorrecta'});assert.equal(bad.status,401);
 });
 test('alojamiento persistente, permisos y publicación',async()=>{
+ for(const fotos of [photos.slice(0,2),[photos[0],photos[0],photos[1]]]){
+  assert.equal((await call('/api/alojamientos','POST',{...listing(),fotos},host.cookie)).status,400);
+ }
  const created=await call('/api/alojamientos','POST',listing(),host.cookie);assert.equal(created.status,201);listingId=created.body.id;
  assert.equal((await call(`/api/alojamientos/${listingId}`,'PUT',listing(),other.cookie)).status,404);
  assert.equal((await call('/api/alojamientos','POST',listing(),guest.cookie)).status,403);
  const panel=await call('/api/anfitrion/panel','GET',undefined,host.cookie);assert.equal(panel.body.alojamientos[0].id,listingId);
  assert.equal((await call('/api/alojamientos?q=Toluca')).body.some(a=>a.id===listingId),true);
+ for(const [lat,lon,expected] of [[19.289,-99.656,true],[21,-100,false]]){
+  const result=await call(`/api/alojamientos?latitud=${lat}&longitud=${lon}`);
+  assert.equal(result.status,200);
+  assert.equal(result.body.some(a=>a.id===listingId),expected);
+ }
+ assert.equal((await call('/api/alojamientos?latitud=19')).status,400);
  assert.equal((await call(`/api/alojamientos/${listingId}`,'PUT',{...listing(),publicado:false},host.cookie)).status,200);
  assert.equal((await call(`/api/alojamientos/${listingId}`)).status,404);
  await call(`/api/alojamientos/${listingId}`,'PUT',listing(),host.cookie);
@@ -192,4 +202,34 @@ test('origen externo rechazado y logout invalida sesión',async()=>{
  assert.equal((await call('/api/logout','POST',{},host.cookie)).status,200);
  assert.equal((await call('/api/yo','GET',undefined,host.cookie)).status,401);
  const event=await pool.query("SELECT id FROM audit WHERE actor_id=$1 AND action='sesion.cierre'",[host.user.id]);assert(event.rowCount);
+});
+
+test('foto de perfil privada y notificaciones acotadas a la cuenta',async()=>{
+ const host=await account('anfitrion','avatar-host');
+ const guest=await account('huesped','avatar-guest');
+ assert.equal((await call('/api/perfil/foto','PUT',{foto:photos[0]},host.cookie)).status,403);
+ assert.equal((await call('/api/perfil/foto','PUT',{foto:'data:image/svg+xml;base64,AAAA'},guest.cookie)).status,400);
+ assert.equal((await call('/api/perfil/foto','PUT',{foto:photos[0]},guest.cookie)).status,200);
+ assert.equal((await call('/api/yo','GET',undefined,guest.cookie)).body.avatar,photos[0]);
+ const notice=(await call('/api/notificaciones','GET',undefined,guest.cookie)).body.find(n=>n.texto==='Cambiaste tu foto de perfil.');
+ assert(notice&&!notice.leida);
+ assert.equal((await call('/api/notificaciones','PATCH',{ids:[notice.id]},host.cookie)).status,200);
+ assert.equal((await call('/api/notificaciones','GET',undefined,guest.cookie)).body.find(n=>n.id===notice.id).leida,false);
+ assert.equal((await call('/api/notificaciones','PATCH',{ids:[notice.id]},guest.cookie)).status,200);
+ assert.equal((await call('/api/notificaciones','GET',undefined,guest.cookie)).body.find(n=>n.id===notice.id).leida,true);
+ assert.equal((await call('/api/perfil/foto','PUT',{foto:null},guest.cookie)).body.avatar,null);
+});
+test('administrador cambia su contraseña y revoca sesiones anteriores',async()=>{
+ const host=await account('anfitrion','password-host');
+ const email=`password-admin-${stamp}@example.test`;
+ const pw=await password('AdministradorSeguro2026');
+ await pool.query("INSERT INTO users(id,name,email,password_hash,salt,role) VALUES($1,'Admin',$2,$3,$4,'administrador')",[crypto.randomUUID(),email,pw.password_hash,pw.salt]);
+ const admin=(await call('/api/login','POST',{email,password:'AdministradorSeguro2026'})).cookie;
+ const data={actual:'AdministradorSeguro2026',nueva:'AdministradorRenovado2026',confirmacion:'AdministradorRenovado2026'};
+ assert.equal((await call('/api/perfil/contrasena','PUT',data,host.cookie)).status,403);
+ assert.equal((await call('/api/perfil/contrasena','PUT',{...data,actual:'incorrecta'},admin)).status,400);
+ assert.equal((await call('/api/perfil/contrasena','PUT',data,admin)).status,200);
+ assert.equal((await call('/api/yo','GET',undefined,admin)).status,401);
+ assert.equal((await call('/api/login','POST',{email,password:data.actual})).status,401);
+ assert.equal((await call('/api/login','POST',{email,password:data.nueva})).status,200);
 });

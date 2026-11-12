@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="css/anfitrion.css">
   <script src="js/api.js" defer></script>
   <script src="js/anfitrion.js" defer></script>
+  <link rel="stylesheet" href="css/cuenta.css">
+  <script defer src="js/mapa.js"></script>
 </head>
 
 <body>
@@ -27,7 +29,7 @@
       <button type="button" data-vista="reservas">▤ Reservaciones</button>
       <button type="button" data-vista="ingresos">$ Ingresos</button>
       <button type="button" data-vista="resenas">☆ Reseñas</button>
-      <button type="button" data-vista="notificaciones">○ Notificaciones</button>
+      <button type="button" data-vista="notificaciones">○ Notificaciones <span id="badge-notificaciones" hidden>0</span></button>
     </nav>
 
     <div class="sidebar-pie">
@@ -45,17 +47,6 @@
       <a href="perfil.html">Mi perfil</a>
       <a href="index.html">Volver al inicio ↗</a>
     </header>
-
-    <div class="aviso-demo">
-      <span>
-        <strong>Anfitrión conectado a PostgreSQL.</strong>
-        Tus alojamientos y solicitudes se guardan en el backend compartido.
-      </span>
-
-      <button id="cargar-demo" type="button">
-        Cerrar sesión
-      </button>
-    </div>
 
     <div id="vista"></div>
   </main>
@@ -113,6 +104,13 @@
         >
       </label>
 
+      <input name="latitud" type="hidden">
+      <input name="longitud" type="hidden">
+      <div class="cuenta-acciones">
+        <button type="button" id="mapa-alojamiento">Elegir punto en el mapa</button>
+        <button type="button" id="quitar-punto" hidden>Quitar punto</button>
+        <span id="punto-alojamiento" role="status"></span>
+      </div>
       <div class="form-grid">
         <label>
           Precio por noche, MXN *
@@ -159,6 +157,7 @@
 
       <label>
         Fotografías
+        <small>Agrega entre 3 y 5 fotos distintas para un alojamiento nuevo.</small>
         <input id="fotos" type="file" accept="image/png,image/jpeg" multiple>
         <small>
           Hasta 5 fotografías. Se comprimen para guardarlas en el navegador.
@@ -166,6 +165,7 @@
       </label>
 
       <div id="fotos-preview" class="fotos-preview"></div>
+      <p id="error-editor" role="status"></p>
 
       <label class="check-publicar">
         <input name="publicado" type="checkbox">

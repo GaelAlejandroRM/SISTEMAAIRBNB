@@ -97,7 +97,6 @@ function detail(record){
 }
 document.querySelectorAll('[data-vista]').forEach(b=>b.addEventListener('click',()=>{if(state.busy)return;state.view=b.dataset.vista;state.page=0;state.q='';state.filter='';state.role='';load();$('#contenido').focus();}));
 $('#actualizar').addEventListener('click',()=>{if(!state.busy)load();});
-$('#salir-admin').addEventListener('click',()=>locked(()=>Nomada.logout()));
 document.querySelectorAll('[data-cerrar]').forEach(b=>b.addEventListener('click',()=>{if(!state.busy)$('#'+b.dataset.cerrar).close();}));
 document.querySelectorAll('dialog').forEach(d=>d.addEventListener('cancel',e=>{if(state.busy)e.preventDefault();}));
 $('#vista').addEventListener('submit',e=>{

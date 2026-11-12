@@ -13,7 +13,7 @@ async function verify(value,user) {
  const candidate=await derive(value,user?.salt||'0'.repeat(32),64);
  return crypto.timingSafeEqual(candidate,Buffer.from(user?.password_hash||'00'.repeat(64),'hex'))&&Boolean(user);
 }
-const publicUser=u=>({id:u.id,nombre:u.name,email:u.email,telefono:u.phone,ciudad:u.city||'',miembroDesde:String(new Date(u.created_at).getFullYear()),rol:u.role,activo:u.active});
+const publicUser=u=>({id:u.id,nombre:u.name,email:u.email,telefono:u.phone,ciudad:u.city||'',miembroDesde:String(new Date(u.created_at).getFullYear()),rol:u.role,activo:u.active,avatar:u.avatar||null});
 const cookieToken=req=>req.headers.cookie?.match(/(?:^|;\s*)nomada=([a-f0-9]{64})/)?.[1];
 async function auth(req,pool,role) {
  const token=cookieToken(req); if(!token) fail('Inicia sesión para continuar.',401);

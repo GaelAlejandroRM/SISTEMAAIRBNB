@@ -34,7 +34,7 @@ async function admin(req,res,url,u) {
    if(previous.role==='administrador'&&previous.active&&(!b.activo||role!=='administrador')){
     const count=await first(c,"SELECT count(*)::int n FROM users WHERE role='administrador' AND active");if(count.n<=1)fail('Debe permanecer un administrador activo.',409);
    }
-   await c.query('UPDATE users SET active=$1,role=$2 WHERE id=$3',[b.activo,role,target]);await c.query('DELETE FROM sessions WHERE user_id=$1',[target]);await audit(c,u.id,'admin.usuario',target,{activo:b.activo,rol:role});
+   await c.query('UPDATE users SET active=$1,role=$2 WHERE id=$3',[b.activo,role,target]);await c.query('DELETE FROM sessions WHERE user_id=$1',[target]);await audit(c,u.id,'admin.usuario',target,{activo:b.activo,rol:role});await notify(c,target,'La administración actualizó tu cuenta.');
   });return send(res,200,{mensaje:'Cuenta actualizada y sesiones revocadas.'});
  }
  hit=p.match(/^\/api\/admin\/alojamientos\/([^/]+)$/);
@@ -45,7 +45,7 @@ async function admin(req,res,url,u) {
  hit=p.match(/^\/api\/admin\/resenas\/([^/]+)$/);
  if(hit&&m==='PATCH') {
   const b=await body(req);if(typeof b.visible!=='boolean')fail('Envía visible como booleano.');
-  await transaction(async c=>{const r=await first(c,'UPDATE reviews SET visible=$1 WHERE id=$2 RETURNING id',[b.visible,V.uuid(hit[1])]);if(!r)fail('Reseña no encontrada.',404);await audit(c,u.id,'admin.resena',r.id,{visible:b.visible});});return send(res,200,{mensaje:'Moderación actualizada.'});
+  await transaction(async c=>{const r=await first(c,'UPDATE reviews SET visible=$1 WHERE id=$2 RETURNING id',[b.visible,V.uuid(hit[1])]);if(!r)fail('Reseña no encontrada.',404);await audit(c,u.id,'admin.resena',r.id,{visible:b.visible});const guest=await first(c,'SELECT guest_id FROM reservations WHERE id=(SELECT reservation_id FROM reviews WHERE id=$1)',[r.id]);await notify(c,guest.guest_id,b.visible?'Tu reseña vuelve a estar visible.':'La administración ocultó una reseña.');});return send(res,200,{mensaje:'Moderación actualizada.'});
  }
  fail('Ruta administrativa no encontrada.',404);
 }

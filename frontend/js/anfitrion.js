@@ -106,6 +106,7 @@ function mensaje(texto, error = false) {
 async function cargarDatos() {
   datos = await Nomada.api('/api/anfitrion/panel');
   if (!alojamientoPorId(ui.propiedadCalendario)) ui.propiedadCalendario = datos.alojamientos[0]?.id || '';
+  actualizarNotificaciones(datos.notificaciones);
   render();
 }
 
@@ -271,7 +272,7 @@ function vistaAlojamientos() {
   const consulta = ui.busqueda.toLocaleLowerCase('es');
 
   const alojamientos = datos.alojamientos.filter(a =>
-    `${a.titulo} ${a.ubicacion}`.toLocaleLowerCase('es').includes(consulta)
+    `${a.titulo} ${a.ubicacion}`.toLocaleLowerCase('es').includes(consulta) && (!ui.puntoMapa||MapaNomada.nearby(a,ui.puntoMapa))
   );
 
   return encabezado(
@@ -286,6 +287,8 @@ function vistaAlojamientos() {
                placeholder="Nombre o ubicación">
       </label>
       <button type="submit">Buscar</button>
+      <button type="button" id="buscar-mapa">Elegir en el mapa</button>
+      ${ui.puntoMapa?'<button type="button" id="quitar-mapa">Quitar zona de 25 km</button>':''}
     </form>
 
     ${alojamientos.length ? `
@@ -675,11 +678,13 @@ function abrirEditor(id) {
   const a = alojamientoPorId(id);
 
   form.reset();
+  $('#error-editor').textContent='';
 
   form.elements.id.value = a?.id || '';
   form.elements.titulo.value = a?.titulo || '';
   form.elements.descripcion.value = a?.descripcion || '';
   form.elements.ubicacion.value = a?.ubicacion || '';
+  mostrarPunto(a?.latitud==null?null:a);
   form.elements.precio.value = a ? a.precioCentavos / 100 : '';
   form.elements.capacidad.value = a?.capacidad || 1;
   form.elements.caracteristicas.value = a?.caracteristicas || '';
@@ -708,47 +713,6 @@ function renderFotos() {
     `).join('');
 }
 
-// Comprime las imágenes antes de enviarlas al backend.
-async function comprimirImagen(file) {
-  if (!['image/jpeg', 'image/png'].includes(file.type)) {
-    throw new Error('Solo se permiten imágenes PNG o JPEG.');
-  }
-
-  if (file.size > 8 * 1024 * 1024) {
-    throw new Error('Cada archivo original debe pesar menos de 8 MB.');
-  }
-
-  const url = URL.createObjectURL(file);
-
-  try {
-    const image = new Image();
-
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = () => reject(new Error('No se pudo abrir una imagen.'));
-      image.src = url;
-    });
-
-    const escala = Math.min(1, 800 / Math.max(image.width, image.height));
-    const canvas = document.createElement('canvas');
-
-    canvas.width = Math.max(1, Math.round(image.width * escala));
-    canvas.height = Math.max(1, Math.round(image.height * escala));
-
-    const context = canvas.getContext('2d');
-
-    if (!context) throw new Error('El navegador no pudo procesar la imagen.');
-
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-    return canvas.toDataURL('image/jpeg', .72);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 $('#fotos').addEventListener('change', async event => {
   const input = event.currentTarget;
   const files = [...input.files];
@@ -767,7 +731,7 @@ $('#fotos').addEventListener('change', async event => {
 
     // Procesamiento secuencial para limitar el uso de memoria.
     for (const file of files) {
-      nuevas.push(await comprimirImagen(file));
+      nuevas.push(await Nomada.prepareImage(file));
     }
 
     ui.fotos.push(...nuevas);
@@ -811,6 +775,8 @@ $('#form-alojamiento').addEventListener('submit', async event => {
   event.preventDefault();
   const form=event.currentTarget,button=form.querySelector('[type="submit"]');
   if(ui.procesandoFotos)return mensaje('Espera a que terminen las fotografías.',true);
+  $('#error-editor').textContent='';
+  if(!form.elements.id.value&&new Set(ui.fotos).size<3){$('#error-editor').textContent='Agrega al menos 3 fotografías distintas.';return;}
   button.disabled=true;
   try {
     const b=Object.fromEntries(new FormData(form));
@@ -820,7 +786,7 @@ $('#form-alojamiento').addEventListener('submit', async event => {
     const previous=alojamientoPorId(id);b.categoria=previous?.categoria||'all';
     await Nomada.api(id?`/api/alojamientos/${id}`:'/api/alojamientos',id?'PUT':'POST',b);
     $('#editor').close();await cargarDatos();mensaje('Alojamiento guardado en PostgreSQL.');
-  } catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
+  } catch(e){if($('#editor').open)$('#error-editor').textContent=e.message;else mensaje(e.message,true);}finally{button.disabled=false;}
 });
 document.querySelectorAll('[data-vista]').forEach(button => {
  button.addEventListener('click',async()=>{
@@ -831,6 +797,8 @@ document.querySelectorAll('[data-vista]').forEach(button => {
 $('#vista').addEventListener('click',async event=>{
  const button=event.target.closest('button');if(!button)return;
  try {
+  if(button.id==='buscar-mapa')return MapaNomada.open(ui.puntoMapa,point=>{ui.puntoMapa=point;button.form.requestSubmit();});
+  if(button.id==='quitar-mapa'){ui.puntoMapa=null;button.form.requestSubmit();return;}
   if(button.hasAttribute('data-nuevo'))return abrirEditor();
   if(button.dataset.editar)return abrirEditor(button.dataset.editar);
   if(button.dataset.calendario){ui.propiedadCalendario=button.dataset.calendario;ui.vista='calendario';return render();}
@@ -844,7 +812,7 @@ $('#vista').addEventListener('click',async event=>{
   }else if(button.dataset.reserva){
    if(!confirm(`¿Cambiar a ${button.dataset.estado}?`))return;
    await Nomada.api(`/api/reservas/${button.dataset.reserva}/estado`,'PATCH',{estado:button.dataset.estado});
-  }else if(button.id==='marcar-leidas')await Nomada.api('/api/notificaciones','PATCH',{});
+  }else if(button.id==='marcar-leidas')await Nomada.api('/api/notificaciones','PATCH',{ids:datos.notificaciones.filter(n=>!n.leida).map(n=>n.id)});
   else return;
   await cargarDatos();mensaje('Operación guardada.');
  }catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
@@ -864,10 +832,36 @@ $('#vista').addEventListener('submit',async event=>{
  try{b.alojamientoId=ui.propiedadCalendario;await Nomada.api('/api/bloqueos','POST',b);await cargarDatos();mensaje('Bloqueo guardado.');}
  catch(e){mensaje(e.message,true);}finally{button.disabled=false;}
 });
-$('#cargar-demo').addEventListener('click',()=>Nomada.logout().catch(e=>mensaje(e.message,true)));
+function mostrarPunto(point){
+ const fields=$('#form-alojamiento').elements;
+ fields.latitud.value=point?.latitud??'';
+ fields.longitud.value=point?.longitud??'';
+ $('#quitar-punto').hidden=!point;
+ $('#punto-alojamiento').textContent=point?`Punto seleccionado: ${point.latitud}, ${point.longitud}`:'';
+}
+$('#mapa-alojamiento').addEventListener('click',()=>{
+ const fields=$('#form-alojamiento').elements;
+ const point=fields.latitud.value?{latitud:Number(fields.latitud.value),longitud:Number(fields.longitud.value)}:null;
+ MapaNomada.open(point,mostrarPunto);
+});
+$('#quitar-punto').addEventListener('click',()=>mostrarPunto(null));
+function actualizarNotificaciones(items){
+ const badge=$('#badge-notificaciones');
+ const count=items.filter(item=>!item.leida).length;
+ badge.textContent=count;
+ badge.hidden=count===0;
+}
 document.querySelector('main').hidden=true;
 document.querySelector('aside').hidden=true;
 Nomada.require('anfitrion').then(async user=>{
  document.querySelector('.sidebar-pie strong').textContent=user.nombre;
- await cargarDatos();document.querySelector('main').hidden=false;document.querySelector('aside').hidden=false;
+ await cargarDatos();
+ Nomada.watchNotifications(datos.notificaciones,(items,added)=>{
+  const changed=JSON.stringify(items)!==JSON.stringify(datos.notificaciones);
+  datos.notificaciones=items;
+  actualizarNotificaciones(items);
+  if(changed&&ui.vista==='notificaciones')render();
+  if(added.length)mensaje(added.length===1?added[0].texto:`Tienes ${added.length} notificaciones nuevas.`);
+ });
+ document.querySelector('main').hidden=false;document.querySelector('aside').hidden=false;
 }).catch(e=>mensaje(e.message,true));

@@ -40,13 +40,22 @@ function images(v) {
   return src;
  });
 }
-function listing(b) {
+function coordinates(latitude, longitude) {
+ if ((latitude == null || latitude === '') && (longitude == null || longitude === '')) return [null,null];
+ const number = value => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '') ? Number(value) : NaN;
+ const lat=number(latitude), lon=number(longitude);
+ if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180) fail('Punto del mapa inválido.');
+ return [lat,lon];
+}
+function listing(b, minimumPhotos=0) {
+ const photos=images(b.fotos);
+ if(new Set(photos).size<minimumPhotos) fail('Agrega al menos 3 fotografías distintas.');
  const price=Number(b.precio);
  if(!Number.isFinite(price)||price<=0||price>100000||Math.abs(price*100-Math.round(price*100))>.00001) fail('Precio positivo con hasta dos decimales, máximo 100000 MXN.');
  if(typeof b.publicado!=='boolean') fail('Estado de publicación inválido.');
  if(!Array.isArray(b.servicios)||b.servicios.length>30||b.servicios.some(s=>typeof s!=='string'||s.length>100)) fail('Servicios inválidos.');
  const categories=['all','beachfront','cabins','mansions','pools','tiny','views','luxe'];
  const category=b.categoria||'all'; if(!categories.includes(category)) fail('Categoría inválida.');
- return [text(b.titulo,'Título'),text(b.descripcion,'Descripción',5000),text(b.ubicacion,'Ubicación',300),category,Math.round(price*100),integer(b.capacidad,'Capacidad'),JSON.stringify(b.servicios),text(b.caracteristicas||'','Características',2000,0),JSON.stringify(images(b.fotos)),b.publicado];
+ return [text(b.titulo,'Título'),text(b.descripcion,'Descripción',5000),text(b.ubicacion,'Ubicación',300),category,Math.round(price*100),integer(b.capacidad,'Capacidad'),JSON.stringify(b.servicios),text(b.caracteristicas||'','Características',2000,0),JSON.stringify(photos),b.publicado,...coordinates(b.latitud,b.longitud)];
 }
-module.exports={fail,text,integer,uuid,today,date,period,email,listing};
+module.exports={fail,text,integer,uuid,today,date,period,email,images,coordinates,listing};

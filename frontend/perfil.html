@@ -1,11 +1,39 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nomada | Mi perfil</title><link rel="stylesheet" href="css/anfitrion.css"><script src="js/api.js" defer></script><script src="js/perfil.js" defer></script></head>
-<body><main style="margin:40px auto;max-width:620px;padding:20px"><a class="marca" href="index.html">nomada</a><h1>Mi perfil</h1><p id="resultado" role="status" aria-live="polite">Consultando tu cuenta…</p>
-<form id="perfil" class="panel" hidden>
-<label>Nombre *<input name="nombre" autocomplete="name" maxlength="120" required></label>
-<label>Correo registrado<input id="correo" type="email" autocomplete="email" readonly></label>
-<p>El correo y el rol no se modifican desde este formulario.</p>
-<label>Teléfono<input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>
-<label>Ciudad<input name="ciudad" autocomplete="address-level2" maxlength="200"></label>
-<button type="submit" class="primario">Guardar cambios</button></form>
-<p><a href="recuperar.html">Restablecer mi contraseña por correo</a></p><p><a id="volver" href="acceso.html">Volver a mi panel</a></p></main></body></html>
+<html lang="es">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>Nómada | Mi perfil</title>
+ <link rel="stylesheet" href="css/anfitrion.css">
+ <link rel="stylesheet" href="css/cuenta.css">
+ <script src="js/api.js" defer></script>
+ <script src="js/perfil.js" defer></script>
+</head>
+<body>
+<main class="perfil-pagina">
+ <a class="marca" href="index.html">nómada</a>
+ <h1 id="titulo-perfil">Mi perfil</h1>
+ <p id="resultado" role="status" aria-live="polite">Consultando tu cuenta…</p>
+ <form id="perfil" class="panel" hidden>
+  <label>Nombre <input name="nombre" autocomplete="name" maxlength="120" required></label>
+  <label>Correo registrado <input id="correo" type="email" autocomplete="email" readonly></label>
+  <label>Teléfono <input name="telefono" type="tel" autocomplete="tel" maxlength="30"></label>
+  <label>Ciudad <input name="ciudad" autocomplete="address-level2" maxlength="200"></label>
+  <div><button type="submit" class="primario">Guardar cambios</button></div>
+ </form>
+ <form id="contrasena" class="panel" hidden>
+  <h2>Cambiar contraseña</h2>
+  <label>Contraseña actual <input name="actual" type="password" autocomplete="current-password" maxlength="128" required></label>
+  <label>Nueva contraseña <input name="nueva" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+  <label>Confirma la nueva contraseña <input name="confirmacion" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+  <p>Usa al menos 12 caracteres. Al guardar, se cerrarán tus sesiones activas.</p>
+  <div><button type="submit" class="primario">Cambiar contraseña</button></div>
+ </form>
+ <div class="cuenta-acciones" id="acciones-perfil" hidden>
+  <a id="privacidad-perfil" href="privacidad.html" hidden>Aviso de privacidad y reglas</a>
+  <a id="volver" href="acceso.html">Volver a mi panel</a>
+  <button id="salir-perfil" type="button">Cerrar sesión</button>
+ </div>
+</main>
+</body>
+</html>
